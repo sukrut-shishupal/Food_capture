@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
-/* Layout: one phone-width column. Today's protein/calorie totals up top, the capture buttons next,
-   and the photo review drawn as a Nutrition Facts panel (the one bold element). */
+/* Layout: one phone-width column with a bottom tab bar (Today, Trends, Settings). Today's totals up top,
+   capture buttons next, and the photo review drawn as a Nutrition Facts panel (the one bold element). */
 :root {
   --bg: #f5f7f4;
   --surface: #ffffff;
@@ -210,151 +210,490 @@ footer { color: var(--muted); font-size: 0.85rem; display: flex; flex-direction:
   .spinner { animation-duration: 3s; }
   .bar i { transition: none; }
 }
+
+/* ---- v3: tabs, sheets, day navigation, water, chips, trends, settings ---- */
+.app { padding-block: 14px 110px; }
+.tab { display: flex; flex-direction: column; gap: 22px; }
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 15;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+}
+.tabbar button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 52px;
+  background: none; border: 0; color: var(--muted); font: inherit; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+}
+.tabbar button svg { width: 22px; height: 22px; }
+.tabbar button[aria-selected="true"] { color: var(--accent); }
+
+.streak { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.streak svg { width: 16px; height: 16px; }
+
+.daynav { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
+.daynav > div { text-align: center; }
+.daynav strong { display: block; font-family: var(--f-display); font-size: 1.1rem; font-weight: 800; }
+.round { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 1.3rem; font-weight: 700; cursor: pointer; display: grid; place-items: center; }
+.round:disabled { opacity: .35; cursor: default; }
+.pastnote { background: var(--accent-soft); color: var(--accent); border-radius: 10px; padding: 8px 12px; font-size: 0.9rem; font-weight: 600; text-align: center; }
+
+.goalbtn { background: none; border: 0; padding: 4px 2px; font: inherit; color: var(--muted); font-weight: 500; border-bottom: 1px dashed var(--muted); cursor: pointer; }
+.goalbtn:hover { color: var(--ink); }
+
+.water { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.water .w-title { font-weight: 700; }
+.water .w-sub { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.glasses { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+.glasses i { width: 12px; height: 16px; border-radius: 0 0 4px 4px; border: 1.5px solid var(--accent); }
+.glasses i.full { background: var(--accent); }
+.water .ctl { display: flex; gap: 8px; }
+
+.cap-actions.three { grid-template-columns: 1.2fr 1fr 1fr; }
+.cap-actions.three .btn { padding: 0 10px; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.cap-actions.three .btn.primary { font-size: 0.95rem; }
+
+.quick { display: flex; flex-direction: column; gap: 8px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip-btn { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.chip-btn b { color: var(--accent); font-weight: 800; font-variant-numeric: tabular-nums; }
+.chip-btn.fav { border-color: var(--accent); }
+
+.row-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; }
+.check { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 0.95rem; min-height: 40px; cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+.group { display: flex; flex-direction: column; gap: 8px; }
+.group-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.group-head h3 { font-size: 1rem; font-weight: 800; }
+.group-head span { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.meal { cursor: pointer; grid-template-columns: 56px 1fr auto; }
+.meal .go { color: var(--muted); font-size: 1.2rem; padding: 0 4px; }
+
+/* Bottom sheets */
+.scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 30; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-height: 90vh; overflow-y: auto;
+  background: var(--surface); color: var(--ink); border-radius: 18px 18px 0 0; border-top: 1px solid var(--line);
+  padding: 8px 16px calc(18px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px;
+}
+.sheet-inner { max-width: 560px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.grabber { width: 40px; height: 4px; border-radius: 99px; background: var(--line); margin: 4px auto 0; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.sheet-head h2 { font-size: 1.2rem; }
+.xbtn { background: none; border: 0; color: var(--muted); font: inherit; font-weight: 600; padding: 10px 4px; cursor: pointer; }
+.scale-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.scale-row button { flex: 1; min-width: 60px; min-height: 42px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.result { background: var(--accent-soft); color: var(--accent); border-radius: 12px; padding: 14px; font-weight: 700; }
+.result b { font-size: 2rem; font-weight: 900; font-family: var(--f-display); display: block; color: var(--ink); }
+.radio-list { display: flex; flex-direction: column; gap: 8px; }
+.radio-list label { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.radio-list input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); }
+.radio-list strong { display: block; }
+.radio-list span { color: var(--muted); font-size: 0.85rem; }
+.per100 { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.per100 th, .per100 td { padding: 6px 0; border-top: 1px solid var(--line); text-align: left; }
+.per100 td:last-child, .per100 th:last-child { text-align: right; }
+.per100 th { font-weight: 600; color: var(--muted); font-size: 0.85rem; }
+
+/* Trends */
+.seg { display: inline-grid; grid-auto-flow: column; background: var(--accent-soft); border-radius: 10px; padding: 3px; align-self: flex-start; }
+.seg button { min-height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.tile b { display: block; font-family: var(--f-display); font-size: 1.7rem; font-weight: 900; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tile span { color: var(--muted); font-size: 0.85rem; }
+.chart svg { width: 100%; height: auto; display: block; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.list li:first-child { border-top: 0; }
+.list .nm { font-weight: 700; overflow-wrap: anywhere; min-width: 0; }
+.list .meta { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.list .val { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+.list .rmx { background: none; border: 0; color: var(--muted); text-decoration: underline; font: inherit; font-size: 0.85rem; cursor: pointer; padding: 6px 0; }
+.w-line { fill: none; stroke: var(--accent); stroke-width: 2.2; }
+.w-dot { fill: var(--accent); }
+.w-dot.last { fill: var(--ink); }
+.inline-form { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+
+/* Settings: reminders */
+.status-line { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.status-line .ok, .status-line .bad { font-size: 0.9rem; }
+.rem { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.rem:first-child { border-top: 0; }
+.rem input[type="time"] { font: inherit; font-size: 1.05rem; font-weight: 700; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 8px; }
+.rem input[type="time"] { grid-column: 1; grid-row: 1; }
+.rem .switch { grid-column: 3; grid-row: 1; }
+.rem input[type="text"] { padding: 8px 10px; grid-column: 1 / -1; grid-row: 2; }
+.rem .opts { grid-row: 3; }
+.rem .opts { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); }
+.rem .opts select { width: auto; padding: 6px 8px; font-size: 0.9rem; }
+.rem .opts label { display: inline-flex; gap: 6px; align-items: center; }
+.rem .opts input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+.rem .opts .rmx { margin-left: auto; background: none; border: 0; color: var(--muted); text-decoration: underline; font: inherit; font-size: 0.85rem; cursor: pointer; padding: 6px 0; }
+.switch { position: relative; width: 50px; height: 30px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+.switch span { position: absolute; inset: 0; border-radius: 99px; background: var(--line); transition: background .2s; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .2s; }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(20px); }
+.switch input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.toast { display: flex; align-items: center; gap: 12px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.toast button { background: none; border: 0; color: inherit; font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 4px 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .switch span, .switch span::after { transition: none; }
+}
 </style>
 </head>
 <body>
-
 <div class="app">
   <header class="top">
     <div class="brand">
       <svg viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="9" fill="var(--accent)"/><circle cx="17" cy="17" r="9" fill="none" stroke="var(--accent-ink)" stroke-width="2.4"/><circle cx="17" cy="17" r="3.4" fill="var(--accent-ink)"/></svg>
       Meal Lens
     </div>
-    <button class="iconbtn" id="openSettings" type="button" aria-label="On-device AI status">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-      <span id="todayLabel"></span>
-    </button>
+    <span class="streak" id="streakPill" title="Days in a row you reached your protein goal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 3 4 5 4 9a4 4 0 0 1-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-8z"/></svg>
+      <span id="streakText">Start a streak</span>
+    </span>
   </header>
 
-  <section class="setup" id="setup" hidden aria-labelledby="setupHead">
-    <h2 id="setupHead">Set up on-device AI</h2>
-    <p id="setupText">Meal Lens reads your photos with Gemini Nano, the AI model built into your phone. It runs offline and costs nothing per photo.</p>
-    <div class="bar" id="dlBarWrap" hidden><i id="dlBar"></i></div>
-    <p class="small" id="dlText" aria-live="polite"></p>
-    <button class="btn primary" id="setupGo" type="button">Download the model</button>
-  </section>
+  <!-- ================= TODAY ================= -->
+  <section class="tab" id="tabToday" aria-label="Today">
+    <div class="daynav">
+      <button class="round" id="dayPrev" type="button" aria-label="Previous day">‹</button>
+      <div><strong id="dayTitle">Today</strong><span class="mono" id="daySub"></span></div>
+      <button class="round" id="dayNext" type="button" aria-label="Next day">›</button>
+    </div>
+    <p class="pastnote" id="pastNote" hidden>You're editing a past day. New meals go on this day.</p>
 
-  <section class="today" aria-labelledby="todayHead">
-    <h2 id="todayHead" class="vh">Today</h2>
-    <div>
-      <p class="mono">Protein today</p>
-      <div class="big"><b class="num" id="pNow">0</b><span>/ <span class="num" id="pGoal">130</span> g</span></div>
-    </div>
-    <div class="bar" role="progressbar" aria-label="Protein toward goal" aria-valuemin="0" aria-valuemax="100" id="pBarWrap"><i id="pBar"></i></div>
-    <p class="sub" id="pLeft">130 g to go</p>
-    <div class="kcal-row"><span class="mono">Calories</span><span class="num"><b id="kNow">0</b> / <span id="kGoal">2200</span> kcal</span></div>
-    <div class="bar thin" aria-hidden="true"><i id="kBar"></i></div>
-    <div class="macros"><span>Carbs <strong class="num" id="cNow">0</strong> g</span><span>Fat <strong class="num" id="fNow">0</strong> g</span><span>Meals <strong class="num" id="mCount">0</strong></span></div>
-    <button class="linkbtn" id="goalsToggle" type="button" aria-expanded="false" aria-controls="goalsForm">Edit goals</button>
-    <form id="goalsForm" class="goals" hidden>
-      <label class="field" for="goalP">Protein goal (g/day)<input id="goalP" type="number" inputmode="numeric" min="10" max="500" step="1"></label>
-      <label class="field" for="goalK">Calorie goal (kcal/day)<input id="goalK" type="number" inputmode="numeric" min="500" max="8000" step="10"></label>
-      <button class="btn primary full" type="submit">Save goals</button>
-    </form>
-  </section>
+    <section class="setup" id="setup" hidden aria-labelledby="setupHead">
+      <h2 id="setupHead">Set up on-device AI</h2>
+      <p id="setupText">Meal Lens reads your photos with Gemini Nano, the AI model built into your phone.</p>
+      <div class="bar" id="dlBarWrap" hidden><i id="dlBar"></i></div>
+      <p class="small" id="dlText" aria-live="polite"></p>
+      <button class="btn primary" id="setupGo" type="button">Download the model</button>
+    </section>
 
-  <section class="capture" id="capture" aria-labelledby="capHead">
-    <div>
-      <h2 id="capHead">Log a meal</h2>
-      <p class="hint">Shoot the plate from above with everything in frame. Your phone works out the numbers in a few seconds.</p>
-    </div>
-    <div class="cap-actions" id="photoActions">
-      <label class="btn primary" for="camInput">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-        Take photo
-      </label>
-      <input class="vh" type="file" id="camInput" accept="image/*" capture="environment">
-      <label class="btn" for="libInput">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>
-        Library
-      </label>
-      <input class="vh" type="file" id="libInput" accept="image/*">
-    </div>
-    <p class="note" id="aiNote" hidden></p>
-    <details id="typeIt">
-      <summary>Describe it instead</summary>
-      <div class="panel-body">
-        <label class="field" for="descText">What did you eat?
-          <textarea id="descText" placeholder="2 scrambled eggs, 1 slice whole-wheat toast with butter, black coffee"></textarea>
-        </label>
-        <button class="btn primary" id="descGo" type="button">Estimate</button>
+    <section class="today" aria-label="Protein and calories">
+      <div>
+        <p class="mono">Protein</p>
+        <div class="big"><b class="num" id="pNow">0</b><button class="goalbtn" id="goalBtn" type="button" aria-label="Change protein goal">/ <span class="num" id="pGoal">130</span> g goal</button></div>
       </div>
-    </details>
-    <details id="manual">
-      <summary>Enter numbers yourself</summary>
-      <form class="panel-body" id="manualForm">
-        <div class="manual-grid">
-          <label class="field full" for="manName">Meal<input id="manName" type="text" placeholder="Greek yogurt, 200 g" required></label>
-          <label class="field" for="manP">Protein (g)<input id="manP" type="number" inputmode="decimal" min="0" max="400" step="0.5" required></label>
-          <label class="field" for="manK">Calories (kcal)<input id="manK" type="number" inputmode="numeric" min="0" max="5000" step="1"></label>
+      <div class="bar" role="progressbar" aria-label="Protein toward goal" aria-valuemin="0" aria-valuemax="100" id="pBarWrap"><i id="pBar"></i></div>
+      <p class="sub" id="pLeft">130 g to go</p>
+      <div class="kcal-row"><span class="mono">Calories</span><span class="num"><b id="kNow">0</b> / <span id="kGoal">2200</span> kcal</span></div>
+      <div class="bar thin" aria-hidden="true"><i id="kBar"></i></div>
+      <div class="macros"><span>Carbs <strong class="num" id="cNow">0</strong> g</span><span>Fat <strong class="num" id="fNow">0</strong> g</span><span>Meals <strong class="num" id="mCount">0</strong></span></div>
+    </section>
+
+    <section class="water" aria-label="Water">
+      <div>
+        <div class="w-title">Water</div>
+        <div class="w-sub"><span id="wNow">0</span> of <span id="wGoal">8</span> glasses · <span id="wMl">0</span> ml</div>
+        <div class="glasses" id="glasses" aria-hidden="true"></div>
+      </div>
+      <div class="ctl">
+        <button class="round" id="wMinus" type="button" aria-label="Remove a glass of water">−</button>
+        <button class="round" id="wPlus" type="button" aria-label="Add a glass of water">+</button>
+      </div>
+    </section>
+
+    <section class="capture" id="capture" aria-labelledby="capHead">
+      <div>
+        <h2 id="capHead">Log a meal</h2>
+        <p class="hint">Shoot the plate from above with everything in frame. Your phone works out the numbers.</p>
+      </div>
+      <div class="cap-actions three">
+        <label class="btn primary" for="camInput" id="camBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+          Take photo
+        </label>
+        <input class="vh" type="file" id="camInput" accept="image/*" capture="environment">
+        <label class="btn" for="libInput" id="libBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>
+          Library
+        </label>
+        <input class="vh" type="file" id="libInput" accept="image/*">
+        <button class="btn" id="scanBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M7 8v8M10 8v8M13 8v8M16 8v8"/></svg>
+          Barcode
+        </button>
+      </div>
+      <p class="note" id="aiNote" hidden></p>
+
+      <div class="quick" id="quick" hidden>
+        <p class="mono">Log again</p>
+        <div class="chips" id="quickChips"></div>
+      </div>
+
+      <details id="typeIt">
+        <summary>Describe it instead</summary>
+        <div class="panel-body">
+          <label class="field" for="descText">What did you eat?
+            <textarea id="descText" placeholder="2 scrambled eggs, 1 slice whole-wheat toast with butter, black coffee"></textarea>
+          </label>
+          <button class="btn primary" id="descGo" type="button">Estimate</button>
         </div>
-        <button class="btn primary" type="submit">Add to today</button>
+      </details>
+      <details id="manual">
+        <summary>Enter numbers yourself</summary>
+        <form class="panel-body" id="manualForm">
+          <div class="manual-grid">
+            <label class="field full" for="manName">Meal<input id="manName" type="text" placeholder="Greek yogurt, 200 g" required></label>
+            <label class="field" for="manP">Protein (g)<input id="manP" type="number" inputmode="decimal" min="0" max="400" step="0.5" required></label>
+            <label class="field" for="manK">Calories (kcal)<input id="manK" type="number" inputmode="numeric" min="0" max="5000" step="1"></label>
+            <label class="field" for="manC">Carbs (g)<input id="manC" type="number" inputmode="decimal" min="0" max="1000" step="0.5"></label>
+            <label class="field" for="manF">Fat (g)<input id="manF" type="number" inputmode="decimal" min="0" max="500" step="0.5"></label>
+            <label class="field full" for="manType">Meal<select id="manType"></select></label>
+          </div>
+          <label class="check" for="manFav"><input type="checkbox" id="manFav"> Save as favorite</label>
+          <button class="btn primary" type="submit">Add</button>
+        </form>
+      </details>
+    </section>
+
+    <section class="review" id="review" hidden aria-labelledby="factsTitle">
+      <div class="shot" id="shot" hidden><img id="shotImg" alt="Your meal photo"></div>
+      <div class="status" id="status" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <p aria-live="polite"><span id="statusText">Reading your plate…</span><span class="mono" id="statusTime">0 s</span></p>
+        <button class="btn ghost" id="stopBtn" type="button">Stop</button>
+      </div>
+      <div class="err" id="err" role="alert" hidden></div>
+
+      <div class="facts" id="facts" hidden>
+        <h3 id="factsTitle">Nutrition Facts</h3>
+        <label class="vh" for="mealName">Meal name</label>
+        <input class="meal-name" id="mealName" type="text">
+        <div class="rule thick"></div>
+        <ul class="items" id="items"></ul>
+        <div class="rule mid"></div>
+        <div class="tot cal"><span>Calories</span><b id="tKcal">0</b></div>
+        <div class="rule mid"></div>
+        <div class="tot pro"><span>Protein</span><b id="tPro">0 g</b></div>
+        <div class="tot"><span>Total carbohydrate</span><span id="tCarb">0 g</span></div>
+        <div class="tot"><span>Total fat</span><span id="tFat">0 g</span></div>
+        <div class="rule thick"></div>
+        <p class="conf" id="conf"></p>
+      </div>
+
+      <label class="field" for="notes">Add details for a better estimate
+        <textarea id="notes" placeholder="e.g. 1 cup rice, 150 g chicken, cooked in 1 tsp oil"></textarea>
+      </label>
+      <button class="btn" id="reEst" type="button">Re-estimate with these details</button>
+      <div class="row-fields">
+        <label class="field" for="revType">Meal<select id="revType"></select></label>
+        <label class="check" for="revFav"><input type="checkbox" id="revFav"> Save as favorite</label>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="discard" type="button">Discard</button>
+        <button class="btn primary" id="addLog" type="button" disabled>Add to log</button>
+      </div>
+    </section>
+
+    <section class="meals" aria-labelledby="mealsHead">
+      <h2 id="mealsHead">Meals</h2>
+      <div id="mealGroups" class="tab"></div>
+      <p class="empty" id="emptyMeals">No meals logged yet. Take a photo of your next plate and it will show up here.</p>
+    </section>
+  </section>
+
+  <!-- ================= TRENDS ================= -->
+  <section class="tab" id="tabTrends" hidden aria-labelledby="trendsHead">
+    <h2 id="trendsHead">Trends</h2>
+    <div class="seg" role="group" aria-label="Range">
+      <button type="button" id="rng7" aria-pressed="true">7 days</button>
+      <button type="button" id="rng30" aria-pressed="false">30 days</button>
+    </div>
+    <div class="card">
+      <p class="mono">Protein per day</p>
+      <div class="chart" id="trendChart" role="img" aria-label="Protein per day"></div>
+      <p class="small">The dashed line is your current goal. Tap a bar to open that day.</p>
+    </div>
+    <div class="tiles">
+      <div class="tile"><b id="tAvg">0 g</b><span>Average protein on logged days</span></div>
+      <div class="tile"><b id="tHit">0/7</b><span>Days you reached your goal</span></div>
+      <div class="tile"><b id="tStreak">0</b><span>Current streak (days)</span></div>
+      <div class="tile"><b id="tBest">0</b><span>Best streak (days)</span></div>
+    </div>
+    <div class="card">
+      <h2>Most logged</h2>
+      <ul class="list" id="topFoods"></ul>
+      <p class="small" id="topEmpty">Foods you log often show up here, with how much protein they give per 100 kcal.</p>
+    </div>
+    <div class="card">
+      <h2>Weight</h2>
+      <form class="inline-form" id="weightForm">
+        <label class="field" for="wtIn">Today's weight (<span id="wtUnit">kg</span>)<input id="wtIn" type="number" inputmode="decimal" min="20" max="400" step="0.1" required></label>
+        <button class="btn primary" type="submit">Log</button>
       </form>
-    </details>
-  </section>
-
-  <section class="review" id="review" hidden aria-labelledby="factsTitle">
-    <div class="shot" id="shot" hidden><img id="shotImg" alt="Your meal photo"></div>
-    <div class="status" id="status" hidden>
-      <div class="spinner" aria-hidden="true"></div>
-      <p aria-live="polite"><span id="statusText">Reading your plate…</span><span class="mono" id="statusTime">0 s</span></p>
-      <button class="btn ghost" id="stopBtn" type="button">Stop</button>
-    </div>
-    <div class="err" id="err" role="alert" hidden></div>
-
-    <div class="facts" id="facts" hidden>
-      <h3 id="factsTitle">Nutrition Facts</h3>
-      <label class="vh" for="mealName">Meal name</label>
-      <input class="meal-name" id="mealName" type="text">
-      <div class="rule thick"></div>
-      <ul class="items" id="items"></ul>
-      <div class="rule mid"></div>
-      <div class="tot cal"><span>Calories</span><b id="tKcal">0</b></div>
-      <div class="rule mid"></div>
-      <div class="tot pro"><span>Protein</span><b id="tPro">0 g</b></div>
-      <div class="tot"><span>Total carbohydrate</span><span id="tCarb">0 g</span></div>
-      <div class="tot"><span>Total fat</span><span id="tFat">0 g</span></div>
-      <div class="rule thick"></div>
-      <p class="conf" id="conf"></p>
-    </div>
-
-    <label class="field" for="notes" id="notesLabel">Add details for a better estimate
-      <textarea id="notes" placeholder="e.g. 1 cup rice, 150 g chicken, cooked in 1 tsp oil"></textarea>
-    </label>
-    <button class="btn" id="reEst" type="button">Re-estimate with these details</button>
-    <div class="row">
-      <button class="btn ghost" id="discard" type="button">Discard</button>
-      <button class="btn primary" id="addLog" type="button" disabled>Add to today</button>
+      <p id="wtSummary" class="small">Log your weight now and then to see the trend and to calculate your protein goal.</p>
+      <div class="chart" id="weightChart" role="img" aria-label="Weight over time"></div>
+      <ul class="list" id="weightList"></ul>
     </div>
   </section>
 
-  <section class="meals" aria-labelledby="mealsHead">
-    <h2 id="mealsHead">Today's meals</h2>
-    <ul class="meal-list" id="mealList"></ul>
-    <p class="empty" id="emptyMeals">No meals logged yet. Take a photo of your next plate and it will show up here.</p>
-  </section>
+  <!-- ================= SETTINGS ================= -->
+  <section class="tab" id="tabSettings" hidden aria-labelledby="settingsTabHead">
+    <h2 id="settingsTabHead" class="vh">Settings</h2>
 
-  <section class="week" aria-labelledby="weekHead">
-    <h2 id="weekHead">Last 7 days</h2>
-    <div id="week" role="img" aria-label="Protein per day for the last 7 days"></div>
-    <p class="cap">Grams of protein per day. The dashed line is your goal.</p>
-  </section>
+    <section class="card" aria-labelledby="goalsHead">
+      <h2 id="goalsHead">Daily goals</h2>
+      <form id="goalsForm" class="panel-body" style="padding-top:0">
+        <div class="row-fields">
+          <label class="field" for="goalP">Protein (g)<input id="goalP" type="number" inputmode="numeric" min="10" max="500" step="1"></label>
+          <label class="field" for="goalK">Calories (kcal)<input id="goalK" type="number" inputmode="numeric" min="500" max="8000" step="10"></label>
+          <label class="field" for="goalW">Water (glasses)<input id="goalW" type="number" inputmode="numeric" min="1" max="30" step="1"></label>
+          <label class="field" for="glassMl">Glass size (ml)<input id="glassMl" type="number" inputmode="numeric" min="50" max="1000" step="10"></label>
+          <label class="field" for="unitSel">Weight unit<select id="unitSel"><option value="kg">kg</option><option value="lb">lb</option></select></label>
+        </div>
+        <button class="btn" id="calcOpen" type="button">Calculate protein goal from body weight</button>
+        <button class="btn primary" type="submit">Save goals</button>
+      </form>
+    </section>
 
-  <section class="settings" id="settings" aria-labelledby="settingsHead">
-    <h2 id="settingsHead">On-device AI</h2>
-    <p><strong id="aiState">Checking…</strong></p>
-    <p class="small" id="aiDetail">Photos are analyzed by Gemini Nano on this phone. Nothing is sent to a server and there is no per-photo cost.</p>
-    <button class="btn" id="aiRecheck" type="button">Check again</button>
-    <p class="small">Protein, calories, carbs and fat for common foods come from a built-in nutrition table (USDA and IFCT style values). Foods not in the table use the model's own estimate and are marked "AI estimate".</p>
-  </section>
+    <section class="card" aria-labelledby="remHead">
+      <h2 id="remHead">Reminders</h2>
+      <div class="status-line" id="notifStatus"></div>
+      <div class="row" id="notifBtns">
+        <button class="btn" id="allowNotif" type="button">Allow notifications</button>
+        <button class="btn" id="exactBtn" type="button">Exact timing</button>
+      </div>
+      <div id="remList"></div>
+      <div class="row">
+        <button class="btn" id="addRem" type="button">Add reminder</button>
+        <button class="btn ghost" id="testNotif" type="button">Send test</button>
+      </div>
+      <p class="small">"Only if behind" skips the reminder once you've reached that day's goal. Each notification shows how much you've had so far.</p>
+    </section>
 
-  <footer>
-    <p>Estimates are approximate. Hidden oil, sauces and portion size can move them a lot, so use the package label when you have one.</p>
-    <p>Photos never leave your phone. Your log keeps a small thumbnail, not the full photo.</p>
-    <p id="storeNote">Your log is saved on this phone. Uninstalling the app deletes it.</p>
-  </footer>
+    <section class="card" aria-labelledby="favHead">
+      <h2 id="favHead">Favorites</h2>
+      <ul class="list" id="favList"></ul>
+      <p class="small" id="favEmpty">Save a meal as a favorite and it appears first under "Log again" for one-tap logging.</p>
+    </section>
+
+    <section class="settings card" id="settings" aria-labelledby="settingsHead">
+      <h2 id="settingsHead">On-device AI</h2>
+      <p><strong id="aiState">Checking…</strong></p>
+      <p class="small" id="aiDetail">Photos are analyzed by Gemini Nano on this phone. Nothing is sent to a server and there is no per-photo cost.</p>
+      <button class="btn" id="aiRecheck" type="button">Check again</button>
+      <p class="small">Protein, calories, carbs and fat for common foods come from a built-in nutrition table (USDA and IFCT style values). Foods not in the table use the model's own estimate and are marked "AI estimate". Barcode lookups use Open Food Facts.</p>
+    </section>
+
+    <section class="card" aria-labelledby="backupHead">
+      <h2 id="backupHead">Backup</h2>
+      <p class="small">Your log lives only on this phone. Save a backup to Drive or email it to yourself now and then.</p>
+      <button class="btn" id="exportCsv" type="button">Export meals as CSV</button>
+      <button class="btn" id="backupBtn" type="button">Back up everything</button>
+      <label class="btn ghost" for="restoreIn">Restore from a backup</label>
+      <input class="vh" type="file" id="restoreIn" accept="application/json,.json">
+      <p id="restoreMsg" class="small" aria-live="polite"></p>
+      <button class="btn danger" id="restoreConfirm" type="button" hidden>Replace my log with this backup</button>
+    </section>
+
+    <footer>
+      <p>Estimates are approximate. Hidden oil, sauces and portion size can move them a lot, so use the package label when you have one.</p>
+      <p>Photos never leave your phone. Your log keeps a small thumbnail, not the full photo.</p>
+      <p>Protein targets in the calculator follow common sports-nutrition ranges. If you have kidney disease, ask your doctor before raising protein.</p>
+    </footer>
+  </section>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<nav class="tabbar" aria-label="Sections">
+  <button type="button" id="navToday" aria-selected="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>Today
+  </button>
+  <button type="button" id="navTrends" aria-selected="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Trends
+  </button>
+  <button type="button" id="navSettings" aria-selected="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Settings
+  </button>
+</nav>
+
+<!-- ================= SHEETS ================= -->
+<div class="scrim" id="scrim" hidden></div>
+
+<section class="sheet" id="mealSheet" hidden role="dialog" aria-modal="true" aria-labelledby="mealSheetHead">
+  <div class="sheet-inner">
+    <div class="grabber"></div>
+    <div class="sheet-head"><h2 id="mealSheetHead">Edit meal</h2><button class="xbtn" type="button" data-close>Close</button></div>
+    <label class="field" for="emName">Name<input id="emName" type="text"></label>
+    <div class="row-fields">
+      <label class="field" for="emP">Protein (g)<input id="emP" type="number" inputmode="decimal" min="0" step="0.5"></label>
+      <label class="field" for="emK">Calories (kcal)<input id="emK" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label class="field" for="emC">Carbs (g)<input id="emC" type="number" inputmode="decimal" min="0" step="0.5"></label>
+      <label class="field" for="emF">Fat (g)<input id="emF" type="number" inputmode="decimal" min="0" step="0.5"></label>
+    </div>
+    <div>
+      <p class="mono" style="margin-bottom:6px">Change portion</p>
+      <div class="scale-row" id="emScale">
+        <button type="button" data-k="0.5">½×</button><button type="button" data-k="0.75">¾×</button><button type="button" data-k="1.5">1½×</button><button type="button" data-k="2">2×</button>
+      </div>
+    </div>
+    <label class="field" for="emType">Meal<select id="emType"></select></label>
+    <label class="check" for="emFav"><input type="checkbox" id="emFav"> Favorite</label>
+    <button class="btn primary" id="emSave" type="button">Save changes</button>
+    <div class="row">
+      <button class="btn ghost" id="emCopy" type="button">Log again now</button>
+      <button class="btn ghost danger" id="emDel" type="button">Delete</button>
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="calcSheet" hidden role="dialog" aria-modal="true" aria-labelledby="calcHead">
+  <div class="sheet-inner">
+    <div class="grabber"></div>
+    <div class="sheet-head"><h2 id="calcHead">Protein goal</h2><button class="xbtn" type="button" data-close>Close</button></div>
+    <label class="field" for="goalDirect">Daily protein goal (g)
+      <div class="key-row">
+        <input id="goalDirect" type="number" inputmode="numeric" min="10" max="500" step="1">
+        <button class="btn primary" id="goalDirectSave" type="button">Save</button>
+      </div>
+    </label>
+    <p class="mono">Or calculate it from body weight</p>
+    <label class="field" for="calcW">Body weight (<span id="calcUnit">kg</span>)<input id="calcW" type="number" inputmode="decimal" min="20" max="400" step="0.1"></label>
+    <div class="radio-list" id="calcGoals">
+      <label><input type="radio" name="calcGoal" value="1.2"><div><strong>Stay healthy</strong><span>1.2 g per kg</span></div></label>
+      <label><input type="radio" name="calcGoal" value="1.6" checked><div><strong>Active, keep muscle</strong><span>1.6 g per kg</span></div></label>
+      <label><input type="radio" name="calcGoal" value="1.8"><div><strong>Build muscle</strong><span>1.8 g per kg</span></div></label>
+      <label><input type="radio" name="calcGoal" value="2.0"><div><strong>Lose fat, keep muscle</strong><span>2.0 g per kg</span></div></label>
+    </div>
+    <div class="result" aria-live="polite"><b id="calcOut">— g</b>protein per day</div>
+    <button class="btn primary" id="calcUse" type="button">Use this goal</button>
+  </div>
+</section>
+
+<section class="sheet" id="bcSheet" hidden role="dialog" aria-modal="true" aria-labelledby="bcHead">
+  <div class="sheet-inner">
+    <div class="grabber"></div>
+    <div class="sheet-head"><h2 id="bcHead">Barcode</h2><button class="xbtn" type="button" data-close>Close</button></div>
+    <p id="bcStatus" aria-live="polite"></p>
+    <div id="bcFound" hidden class="panel-body" style="padding-top:0">
+      <p class="small" id="bcBrand"></p>
+      <table class="per100">
+        <thead><tr><th>Per 100 g</th><th></th></tr></thead>
+        <tbody id="bcTable"></tbody>
+      </table>
+      <label class="field" for="bcAmt">Amount you ate (g)<input id="bcAmt" type="number" inputmode="decimal" min="1" max="3000" step="1"></label>
+      <div class="scale-row" id="bcQuick"></div>
+      <div class="result"><b id="bcOut">0 g</b><span id="bcOutSub">protein</span></div>
+      <label class="field" for="bcType">Meal<select id="bcType"></select></label>
+      <label class="check" for="bcFav"><input type="checkbox" id="bcFav"> Save as favorite</label>
+      <button class="btn primary" id="bcAdd" type="button">Add to log</button>
+    </div>
+    <button class="btn" id="bcManual" type="button" hidden>Enter numbers yourself</button>
+  </div>
+</section>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toastText"></span><button type="button" id="toastUndo" hidden>Undo</button></div>
 
 <script src="nutrition.js"></script>
 <script src="app.js"></script>
