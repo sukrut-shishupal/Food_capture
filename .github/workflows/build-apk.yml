@@ -24,7 +24,20 @@ jobs:
           gradle-version: "8.11.1"
 
       - name: Build
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon 2>&1 | tee build.log
+
+      - name: Report build errors
+        if: failure()
+        run: |
+          # Surface compiler errors and Gradle's failure summary as annotations.
+          grep -E '^e: |error:|ERROR:' build.log | head -15 | while IFS= read -r line; do
+            echo "::error title=Build error::${line}"
+          done
+          summary=$(sed -n '/What went wrong:/,/Try:/p' build.log | head -60 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+          [ -n "$summary" ] && echo "::error title=Gradle failure::${summary}"
+          exit 1
 
       - name: Rename APK
         run: cp app/build/outputs/apk/debug/app-debug.apk MealLens.apk
