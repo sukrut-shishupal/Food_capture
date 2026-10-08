@@ -3,4 +3,9 @@
     <color name="ic_bg">#1D6A44</color>
     <color name="page_light">#F5F7F4</color>
     <color name="page_dark">#0D120F</color>
+    <color name="w_bg">#FFFFFF</color>
+    <color name="w_ink">#141A16</color>
+    <color name="w_muted">#5A665E</color>
+    <color name="w_track">#E0EDE5</color>
+    <color name="w_accent">#1D6A44</color>
 </resources>

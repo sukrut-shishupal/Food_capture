@@ -28,6 +28,7 @@ class MainActivity : Activity() {
 
     private lateinit var webView: WebView
     private lateinit var nano: NanoBridge
+    private lateinit var app: AppBridge
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var cameraUri: Uri? = null
 
@@ -53,6 +54,9 @@ class MainActivity : Activity() {
         // so exposing the model bridge to it is safe.
         nano = NanoBridge(webView)
         webView.addJavascriptInterface(nano, "MealLensAI")
+        app = AppBridge(this, webView)
+        webView.addJavascriptInterface(app, "MealLensApp")
+        Reminders.ensureChannel(this)
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
@@ -81,7 +85,13 @@ class MainActivity : Activity() {
                 filePathCallback?.onReceiveValue(null)
                 filePathCallback = callback
 
-                val intent = if (params.isCaptureEnabled) cameraIntent() else galleryIntent()
+                val accepts = params.acceptTypes.filter { it.isNotBlank() }
+                val imagesOnly = accepts.isEmpty() || accepts.all { it.startsWith("image") }
+                val intent = when {
+                    !imagesOnly -> pickerIntent("*/*")
+                    params.isCaptureEnabled -> cameraIntent()
+                    else -> galleryIntent()
+                }
                 try {
                     startActivityForResult(intent, REQUEST_PHOTO)
                 } catch (_: ActivityNotFoundException) {
@@ -119,12 +129,25 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun galleryIntent(): Intent {
+    private fun galleryIntent(): Intent = pickerIntent("image/*")
+
+    private fun pickerIntent(mime: String): Intent {
         cameraUri = null
         return Intent(Intent.ACTION_GET_CONTENT).apply {
-            type = "image/*"
+            type = mime
             addCategory(Intent.CATEGORY_OPENABLE)
         }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == AppBridge.REQ_NOTIFY) app.onNotificationResult()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Lets the page refresh the date, permissions and model status after returning to the app.
+        webView.evaluateJavascript("window.__appEvent && window.__appEvent({type:'resume'});", null)
     }
 
     @Deprecated("Deprecated in Java")
@@ -155,15 +178,15 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
+        // Let the page close an open panel or switch back to Today first.
+        webView.evaluateJavascript("(window.__back && window.__back()) ? 'handled' : 'no'") { result ->
+            if (result?.contains("handled") != true) moveTaskToBack(true)
         }
     }
 
     override fun onDestroy() {
         nano.close()
+        app.close()
         webView.destroy()
         super.onDestroy()
     }
