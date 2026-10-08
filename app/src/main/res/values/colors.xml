@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_bg">#1D6A44</color>
+    <color name="page_light">#F5F7F4</color>
+    <color name="page_dark">#0D120F</color>
+</resources>
