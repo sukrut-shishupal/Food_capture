@@ -144,6 +144,8 @@ details[open] summary::before { content: "–"; }
 .item-main { min-width: 0; }
 .item-name { font-weight: 700; display: block; overflow-wrap: anywhere; }
 .item-portion { color: var(--muted); font-size: 0.85rem; }
+.src { font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); display: block; margin-top: 2px; }
+.src.est { color: var(--warn); }
 .item-nums { text-align: right; font-variant-numeric: tabular-nums; }
 .item-nums b { display: block; font-weight: 800; }
 .item-nums span { color: var(--muted); font-size: 0.85rem; }
@@ -218,21 +220,18 @@ footer { color: var(--muted); font-size: 0.85rem; display: flex; flex-direction:
       <svg viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="9" fill="var(--accent)"/><circle cx="17" cy="17" r="9" fill="none" stroke="var(--accent-ink)" stroke-width="2.4"/><circle cx="17" cy="17" r="3.4" fill="var(--accent-ink)"/></svg>
       Meal Lens
     </div>
-    <button class="iconbtn" id="openSettings" type="button" aria-label="Settings">
+    <button class="iconbtn" id="openSettings" type="button" aria-label="On-device AI status">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       <span id="todayLabel"></span>
     </button>
   </header>
 
   <section class="setup" id="setup" hidden aria-labelledby="setupHead">
-    <h2 id="setupHead">One-time setup</h2>
-    <p>Meal Lens uses Claude to read your photos. It needs your own Anthropic API key. Usage is billed to that key per photo, at a small cost for each one.</p>
-    <ol>
-      <li>Open <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a>, sign in, and add a little credit under Billing.</li>
-      <li>Create an API key and copy it.</li>
-      <li>Paste it in Settings below. It stays on this phone.</li>
-    </ol>
-    <button class="btn primary" id="setupGo" type="button">Add my API key</button>
+    <h2 id="setupHead">Set up on-device AI</h2>
+    <p id="setupText">Meal Lens reads your photos with Gemini Nano, the AI model built into your phone. It runs offline and costs nothing per photo.</p>
+    <div class="bar" id="dlBarWrap" hidden><i id="dlBar"></i></div>
+    <p class="small" id="dlText" aria-live="polite"></p>
+    <button class="btn primary" id="setupGo" type="button">Download the model</button>
   </section>
 
   <section class="today" aria-labelledby="todayHead">
@@ -257,7 +256,7 @@ footer { color: var(--muted); font-size: 0.85rem; display: flex; flex-direction:
   <section class="capture" id="capture" aria-labelledby="capHead">
     <div>
       <h2 id="capHead">Log a meal</h2>
-      <p class="hint">Shoot the plate from above with everything in frame. The numbers come back in a few seconds.</p>
+      <p class="hint">Shoot the plate from above with everything in frame. Your phone works out the numbers in a few seconds.</p>
     </div>
     <div class="cap-actions" id="photoActions">
       <label class="btn primary" for="camInput">
@@ -342,36 +341,22 @@ footer { color: var(--muted); font-size: 0.85rem; display: flex; flex-direction:
   </section>
 
   <section class="settings" id="settings" aria-labelledby="settingsHead">
-    <h2 id="settingsHead">Settings</h2>
-    <label class="field" for="apiKey">Anthropic API key
-      <div class="key-row">
-        <input id="apiKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-ant-…">
-        <button class="btn" id="toggleKey" type="button" aria-label="Show key">Show</button>
-      </div>
-    </label>
-    <label class="field" for="model">Model
-      <select id="model">
-        <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (more accurate)</option>
-        <option value="claude-haiku-5-5">Claude Haiku 5.5 (faster, cheaper)</option>
-      </select>
-    </label>
-    <div class="row">
-      <button class="btn" id="testKey" type="button">Test key</button>
-      <button class="btn primary" id="saveKey" type="button">Save</button>
-    </div>
-    <p id="keyStatus" aria-live="polite"></p>
-    <p class="small">Your key is stored only on this phone and sent only to Anthropic. Manage keys and spending limits at <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a>.</p>
-    <button class="btn ghost danger" id="clearKey" type="button">Remove key from this phone</button>
+    <h2 id="settingsHead">On-device AI</h2>
+    <p><strong id="aiState">Checking…</strong></p>
+    <p class="small" id="aiDetail">Photos are analyzed by Gemini Nano on this phone. Nothing is sent to a server and there is no per-photo cost.</p>
+    <button class="btn" id="aiRecheck" type="button">Check again</button>
+    <p class="small">Protein, calories, carbs and fat for common foods come from a built-in nutrition table (USDA and IFCT style values). Foods not in the table use the model's own estimate and are marked "AI estimate".</p>
   </section>
 
   <footer>
     <p>Estimates are approximate. Hidden oil, sauces and portion size can move them a lot, so use the package label when you have one.</p>
-    <p>Photos go to Anthropic's Claude API only when you ask for an estimate. Your log keeps a small thumbnail, not the full photo.</p>
+    <p>Photos never leave your phone. Your log keeps a small thumbnail, not the full photo.</p>
     <p id="storeNote">Your log is saved on this phone. Uninstalling the app deletes it.</p>
   </footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+<script src="nutrition.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

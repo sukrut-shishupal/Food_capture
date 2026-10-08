@@ -21,11 +21,13 @@ import java.io.File
 /**
  * Meal Lens is a single web page (assets/index.html) shown in a WebView.
  * This activity serves that page, opens the camera or the photo picker when
- * the page asks for a photo, and sends outside links to the browser.
+ * the page asks for a photo, hands photos to the on-device model (NanoBridge),
+ * and sends outside links to the browser.
  */
 class MainActivity : Activity() {
 
     private lateinit var webView: WebView
+    private lateinit var nano: NanoBridge
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private var cameraUri: Uri? = null
 
@@ -46,6 +48,11 @@ class MainActivity : Activity() {
             allowFileAccess = false
             mediaPlaybackRequiresUserGesture = true
         }
+
+        // The page only ever loads bundled files (outside links open in the browser),
+        // so exposing the model bridge to it is safe.
+        nano = NanoBridge(webView)
+        webView.addJavascriptInterface(nano, "MealLensAI")
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
@@ -156,6 +163,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        nano.close()
         webView.destroy()
         super.onDestroy()
     }

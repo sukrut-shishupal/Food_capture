@@ -5,14 +5,15 @@ plugins {
 
 android {
     namespace = "com.meallens.app"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.meallens.app"
+        // ML Kit GenAI (Gemini Nano) needs API 26+; the model itself only runs on supported phones.
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
     }
 
     // A fixed test key, so every new build installs over the previous one
@@ -49,4 +50,6 @@ android {
 dependencies {
     implementation("androidx.core:core:1.13.1")
     implementation("androidx.webkit:webkit:1.11.0")
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }
