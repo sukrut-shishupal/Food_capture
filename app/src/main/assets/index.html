@@ -216,7 +216,7 @@ footer { color: var(--muted); font-size: 0.85rem; display: flex; flex-direction:
 .tab { display: flex; flex-direction: column; gap: 22px; }
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 15;
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   background: var(--surface); border-top: 1px solid var(--line);
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
 }
@@ -313,7 +313,7 @@ select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backgro
 .list .nm { font-weight: 700; overflow-wrap: anywhere; min-width: 0; }
 .list .meta { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .list .val { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
-.list .rmx { background: none; border: 0; color: var(--muted); text-decoration: underline; font: inherit; font-size: 0.85rem; cursor: pointer; padding: 6px 0; }
+.list .rmx { justify-self: start; background: none; border: 0; color: var(--muted); text-decoration: underline; font: inherit; font-size: 0.85rem; cursor: pointer; padding: 6px 0; }
 .w-line { fill: none; stroke: var(--accent); stroke-width: 2.2; }
 .w-dot { fill: var(--accent); }
 .w-dot.last { fill: var(--ink); }
@@ -344,6 +344,44 @@ select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backgro
 
 .toast { display: flex; align-items: center; gap: 12px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .toast button { background: none; border: 0; color: inherit; font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 4px 0; }
+
+/* v4: water bottles, supplements, body */
+.water2 { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.w2-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.w2-top .w-title { font-size: 1.15rem; }
+.w-sub { color: var(--muted); font-variant-numeric: tabular-nums; }
+.w-sub b { color: var(--ink); font-size: 1.1rem; }
+.bottles { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.bottle { position: relative; width: 26px; height: 52px; border: 2px solid var(--accent); border-radius: 6px 6px 8px 8px; overflow: hidden; background: var(--bg); }
+.bottle::before { content: ""; position: absolute; top: -2px; left: 50%; width: 10px; height: 6px; margin-left: -5px; background: var(--accent); border-radius: 2px; }
+.bottle i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); opacity: .85; }
+.w-add { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.w-add button { min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+.supps { list-style: none; margin: 0; padding: 0; }
+.supp { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.supp:first-child { border-top: 0; padding-top: 0; }
+.supp .nm { font-weight: 700; overflow-wrap: anywhere; }
+.supp .dose { color: var(--ink); font-size: 0.9rem; }
+.supp .why { grid-column: 1 / -1; color: var(--muted); font-size: 0.82rem; }
+.supp .why.warn { color: var(--warn); }
+.take { min-height: 42px; min-width: 92px; padding: 0 14px; border-radius: 99px; border: 1.5px solid var(--accent); background: transparent; color: var(--accent); font: inherit; font-weight: 800; cursor: pointer; }
+.take.done { background: var(--accent); color: var(--accent-ink); }
+.suppset { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 10px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.suppset:first-child { border-top: 0; }
+.suppset .nm { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.suppset input[type="time"] { font: inherit; font-weight: 700; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 6px; }
+.suppset .dose-in { grid-column: 1 / -1; }
+.suppset .rmx { grid-column: 1 / -1; justify-self: start; background: none; border: 0; color: var(--muted); text-decoration: underline; font: inherit; font-size: 0.85rem; cursor: pointer; padding: 4px 0; }
+.row-fields.tight { gap: 8px; }
+.row-fields .full { grid-column: 1 / -1; }
+.unitbox { position: relative; display: block; }
+.unitbox input { padding-right: 30px; }
+.unitbox span { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.9rem; pointer-events: none; }
+div.field { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.w-trend { fill: none; stroke: var(--accent); stroke-width: 2.4; }
+.w-raw { fill: var(--muted); opacity: .7; }
+.w-target { stroke: var(--ink); stroke-dasharray: 4 4; stroke-width: 1; opacity: .5; }
+.list .why { grid-column: 1 / -1; color: var(--muted); font-size: 0.82rem; }
 
 @media (prefers-reduced-motion: reduce) {
   .switch span, .switch span::after { transition: none; }
@@ -392,16 +430,25 @@ select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backgro
       <div class="macros"><span>Carbs <strong class="num" id="cNow">0</strong> g</span><span>Fat <strong class="num" id="fNow">0</strong> g</span><span>Meals <strong class="num" id="mCount">0</strong></span></div>
     </section>
 
-    <section class="water" aria-label="Water">
-      <div>
-        <div class="w-title">Water</div>
-        <div class="w-sub"><span id="wNow">0</span> of <span id="wGoal">8</span> glasses · <span id="wMl">0</span> ml</div>
-        <div class="glasses" id="glasses" aria-hidden="true"></div>
+    <section class="water2" aria-labelledby="waterHead">
+      <div class="w2-top">
+        <div>
+          <h2 id="waterHead" class="w-title">Water</h2>
+          <div class="w-sub"><b id="wNow">0</b> of <span id="wGoal">0</span> <span class="wUnit">oz</span> · <span id="wBottles">0</span></div>
+        </div>
+        <button class="round" id="wMinus" type="button" aria-label="Undo last water">−</button>
       </div>
-      <div class="ctl">
-        <button class="round" id="wMinus" type="button" aria-label="Remove a glass of water">−</button>
-        <button class="round" id="wPlus" type="button" aria-label="Add a glass of water">+</button>
+      <div class="bottles" id="bottles" aria-hidden="true"></div>
+      <div class="w-add" role="group" aria-label="Add water">
+        <button type="button" data-f="0.25">+ ¼ bottle</button>
+        <button type="button" data-f="0.5">+ ½ bottle</button>
+        <button type="button" data-f="1">+ Full bottle</button>
       </div>
+    </section>
+
+    <section class="card" aria-labelledby="suppHead" id="suppCard">
+      <div class="group-head"><h2 id="suppHead">Supplements</h2><span id="suppCount"></span></div>
+      <ul class="supps" id="suppToday"></ul>
     </section>
 
     <section class="capture" id="capture" aria-labelledby="capHead">
@@ -527,15 +574,81 @@ select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backgro
       <ul class="list" id="topFoods"></ul>
       <p class="small" id="topEmpty">Foods you log often show up here, with how much protein they give per 100 kcal.</p>
     </div>
+  </section>
+
+  <!-- ================= BODY ================= -->
+  <section class="tab" id="tabBody" hidden aria-labelledby="bodyHead">
+    <h2 id="bodyHead">Body</h2>
+
     <div class="card">
       <h2>Weight</h2>
       <form class="inline-form" id="weightForm">
-        <label class="field" for="wtIn">Today's weight (<span id="wtUnit">kg</span>)<input id="wtIn" type="number" inputmode="decimal" min="20" max="400" step="0.1" required></label>
+        <label class="field" for="wtIn"><span>Today's weight (<span class="uW">lb</span>)</span><input id="wtIn" type="number" inputmode="decimal" min="40" max="900" step="0.1" required></label>
         <button class="btn primary" type="submit">Log</button>
       </form>
-      <p id="wtSummary" class="small">Log your weight now and then to see the trend and to calculate your protein goal.</p>
+      <p id="wtSummary" class="small">Weigh yourself in the morning, after the bathroom and before eating, for the most consistent numbers.</p>
       <div class="chart" id="weightChart" role="img" aria-label="Weight over time"></div>
+      <p class="small" id="wtLegend" hidden>Dots are daily weigh-ins; the line is your trend weight, which smooths out water and food swings. Planning uses the trend.</p>
       <ul class="list" id="weightList"></ul>
+    </div>
+
+    <form class="card" id="profileForm">
+      <h2>About you</h2>
+      <p class="small">Used to work out your calorie, protein and water targets. Stays on this phone.</p>
+      <div class="row-fields">
+        <label class="field" for="pfSex">Sex (for the formula)<select id="pfSex"><option value="">Choose</option><option value="m">Male</option><option value="f">Female</option></select></label>
+        <label class="field" for="pfAge">Age<input id="pfAge" type="number" inputmode="numeric" min="15" max="100" step="1"></label>
+        <div class="field full" id="hUS">Height
+          <div class="row-fields tight">
+            <label class="unitbox" for="pfFt"><input id="pfFt" type="number" inputmode="numeric" min="3" max="8" step="1" aria-label="Feet"><span>ft</span></label>
+            <label class="unitbox" for="pfIn"><input id="pfIn" type="number" inputmode="decimal" min="0" max="11.9" step="0.5" aria-label="Inches"><span>in</span></label>
+          </div>
+        </div>
+        <label class="field" for="pfCm" id="hMetric" hidden>Height (cm)<input id="pfCm" type="number" inputmode="decimal" min="100" max="250" step="0.5"></label>
+        <label class="field full" for="pfAct">Activity
+          <select id="pfAct">
+            <option value="1.2">Mostly sitting, little exercise</option>
+            <option value="1.375">Light: exercise 1–3 days a week</option>
+            <option value="1.55">Moderate: exercise 3–5 days a week</option>
+            <option value="1.725">Hard: exercise 6–7 days a week</option>
+            <option value="1.9">Very hard: physical job plus training</option>
+          </select>
+        </label>
+      </div>
+      <button class="btn primary" type="submit">Save</button>
+    </form>
+
+    <div class="tiles" id="bodyTiles">
+      <div class="tile"><b id="bBmi">–</b><span id="bBmiCat">BMI</span></div>
+      <div class="tile"><b id="bHealthy">–</b><span>Healthy weight range for your height (BMI 18.5–24.9)</span></div>
+      <div class="tile"><b id="bBmr">–</b><span>Calories your body burns at rest</span></div>
+      <div class="tile"><b id="bTdee">–</b><span id="bTdeeLabel">Calories to maintain your weight</span></div>
+    </div>
+    <p class="note" id="bodyMissing">Add your sex, age, height and one weigh-in to see your numbers and plan.</p>
+
+    <form class="card" id="planForm">
+      <h2>Weight plan</h2>
+      <div class="row-fields">
+        <label class="field" for="plTarget"><span>Goal weight (<span class="uW">lb</span>)</span><input id="plTarget" type="number" inputmode="decimal" min="40" max="900" step="0.5"></label>
+        <label class="field" for="plPace">Pace<select id="plPace"></select></label>
+      </div>
+      <div class="result" id="planOut" aria-live="polite"><b>–</b>Set a goal weight to see your plan.</div>
+      <p class="note" id="planWarn" hidden></p>
+      <button class="btn primary" type="submit">Save plan</button>
+    </form>
+
+    <div class="card" id="maintCard" hidden>
+      <h2>Measured from your logs</h2>
+      <p id="maintText"></p>
+      <label class="check" for="useMeasured"><input type="checkbox" id="useMeasured"> Plan with my measured maintenance instead of the formula</label>
+    </div>
+
+    <div class="card">
+      <h2>Daily targets</h2>
+      <ul class="list" id="targetList"></ul>
+      <label class="check" for="syncGoals"><input type="checkbox" id="syncGoals"> Keep my daily goals in sync with this plan</label>
+      <p class="small" id="syncNote">When on, your protein, calorie and water goals update by themselves whenever you log your weight or change your plan.</p>
+      <button class="btn" id="applyTargets" type="button">Use these as my daily goals</button>
     </div>
   </section>
 
@@ -548,11 +661,12 @@ select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backgro
       <form id="goalsForm" class="panel-body" style="padding-top:0">
         <div class="row-fields">
           <label class="field" for="goalP">Protein (g)<input id="goalP" type="number" inputmode="numeric" min="10" max="500" step="1"></label>
-          <label class="field" for="goalK">Calories (kcal)<input id="goalK" type="number" inputmode="numeric" min="500" max="8000" step="10"></label>
-          <label class="field" for="goalW">Water (glasses)<input id="goalW" type="number" inputmode="numeric" min="1" max="30" step="1"></label>
-          <label class="field" for="glassMl">Glass size (ml)<input id="glassMl" type="number" inputmode="numeric" min="50" max="1000" step="10"></label>
-          <label class="field" for="unitSel">Weight unit<select id="unitSel"><option value="kg">kg</option><option value="lb">lb</option></select></label>
+          <label class="field" for="goalK">Calories (kcal)<input id="goalK" type="number" inputmode="numeric" min="800" max="8000" step="10"></label>
+          <label class="field" for="goalW"><span>Water (<span class="wUnit">oz</span>)</span><input id="goalW" type="number" inputmode="numeric" min="8" max="400" step="1"></label>
+          <label class="field" for="bottleSz"><span>Bottle size (<span class="wUnit">oz</span>)</span><input id="bottleSz" type="number" inputmode="numeric" min="4" max="200" step="1"></label>
+          <label class="field full" for="unitSel">Units<select id="unitSel"><option value="us">US: lb, ft/in, oz</option><option value="metric">Metric: kg, cm, ml</option></select></label>
         </div>
+        <p class="small" id="goalsSyncNote" hidden>These goals follow your plan in the Body tab. Saving your own numbers here turns that off.</p>
         <button class="btn" id="calcOpen" type="button">Calculate protein goal from body weight</button>
         <button class="btn primary" type="submit">Save goals</button>
       </form>
@@ -571,6 +685,21 @@ select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backgro
         <button class="btn ghost" id="testNotif" type="button">Send test</button>
       </div>
       <p class="small">"Only if behind" skips the reminder once you've reached that day's goal. Each notification shows how much you've had so far.</p>
+    </section>
+
+    <section class="card" aria-labelledby="suppSetHead">
+      <h2 id="suppSetHead">Supplements</h2>
+      <p class="small">Set a time and switch on a reminder for each. A supplement reminder stays quiet once you've ticked it off that day.</p>
+      <div id="suppSettings"></div>
+      <details id="suppAdd">
+        <summary>Add a supplement</summary>
+        <form class="panel-body" id="suppForm">
+          <label class="field" for="spName">Name<input id="spName" type="text" maxlength="60" required placeholder="Vitamin D3"></label>
+          <label class="field" for="spDose">How much<input id="spDose" type="text" maxlength="80" required placeholder="1 softgel with breakfast"></label>
+          <label class="field" for="spTime">Time<input id="spTime" type="time" value="09:00"></label>
+          <button class="btn primary" type="submit">Add</button>
+        </form>
+      </details>
     </section>
 
     <section class="card" aria-labelledby="favHead">
@@ -601,7 +730,7 @@ select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backgro
     <footer>
       <p>Estimates are approximate. Hidden oil, sauces and portion size can move them a lot, so use the package label when you have one.</p>
       <p>Photos never leave your phone. Your log keeps a small thumbnail, not the full photo.</p>
-      <p>Protein targets in the calculator follow common sports-nutrition ranges. If you have kidney disease, ask your doctor before raising protein.</p>
+      <p>Targets use the Mifflin–St Jeor formula, common sports-nutrition protein ranges and National Academies fluid guidance. They are estimates, not medical advice. If you have kidney disease or take medication, check protein, creatine and magnesium with your doctor.</p>
     </footer>
   </section>
 </div>
@@ -612,6 +741,9 @@ select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backgro
   </button>
   <button type="button" id="navTrends" aria-selected="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Trends
+  </button>
+  <button type="button" id="navBody" aria-selected="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.5" r="2"/><path d="M5 9h14M12 9v5M12 14l-3 7M12 14l3 7"/></svg>Body
   </button>
   <button type="button" id="navSettings" aria-selected="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>Settings
@@ -659,7 +791,7 @@ select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backgro
       </div>
     </label>
     <p class="mono">Or calculate it from body weight</p>
-    <label class="field" for="calcW">Body weight (<span id="calcUnit">kg</span>)<input id="calcW" type="number" inputmode="decimal" min="20" max="400" step="0.1"></label>
+    <label class="field" for="calcW"><span>Body weight (<span id="calcUnit">kg</span>)</span><input id="calcW" type="number" inputmode="decimal" min="20" max="400" step="0.1"></label>
     <div class="radio-list" id="calcGoals">
       <label><input type="radio" name="calcGoal" value="1.2"><div><strong>Stay healthy</strong><span>1.2 g per kg</span></div></label>
       <label><input type="radio" name="calcGoal" value="1.6" checked><div><strong>Active, keep muscle</strong><span>1.6 g per kg</span></div></label>

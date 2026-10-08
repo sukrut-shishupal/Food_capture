@@ -129,7 +129,7 @@ object Reminders {
     fun summary(ctx: Context): JSONObject {
         val s = try { JSONObject(prefs(ctx).getString(KEY_SUMMARY, "{}")) } catch (_: Exception) { JSONObject() }
         if (s.optString("date") != today()) {
-            s.put("protein", 0).put("kcal", 0).put("water", 0).put("date", today())
+            s.put("protein", 0).put("kcal", 0).put("water", 0).put("taken", org.json.JSONArray()).put("date", today())
         }
         return s
     }
@@ -140,11 +140,20 @@ object Reminders {
         val kind = r.optString("kind", "protein")
         val smart = r.optBoolean("smart", true)
         val label = r.optString("label").ifBlank { if (kind == "water") "Water" else "Protein" }
-        return if (kind == "water") {
-            val have = s.optInt("water", 0)
-            val goal = s.optInt("waterGoal", 8)
+        return if (kind == "supplement") {
+            val sid = r.optString("suppId")
+            val taken = s.optJSONArray("taken")
+            if (smart && taken != null) {
+                for (i in 0 until taken.length()) if (taken.optString(i) == sid) return null
+            }
+            val dose = r.optString("dose")
+            label to (if (dose.isNotBlank()) "Take $dose." else "Time for your supplement.")
+        } else if (kind == "water") {
+            val have = s.optDouble("water", 0.0).roundToInt()
+            val goal = s.optDouble("waterGoal", 100.0).roundToInt()
+            val unit = s.optString("waterUnit", "oz")
             if (smart && have >= goal) return null
-            label to "$have of $goal glasses so far today. Time for a glass of water."
+            label to "$have of $goal $unit so far today. ${goal - have} $unit to go."
         } else {
             val have = s.optDouble("protein", 0.0).roundToInt()
             val goal = s.optInt("goal", 130)

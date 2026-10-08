@@ -27,8 +27,9 @@ class ProgressWidget : AppWidgetProvider() {
             val s = Reminders.summary(ctx)
             val protein = s.optDouble("protein", 0.0).roundToInt()
             val goal = s.optInt("goal", 130).coerceAtLeast(1)
-            val water = s.optInt("water", 0)
-            val waterGoal = s.optInt("waterGoal", 8)
+            val water = s.optDouble("water", 0.0).roundToInt()
+            val waterGoal = s.optDouble("waterGoal", 100.0).roundToInt()
+            val unit = s.optString("waterUnit", "oz")
             val left = goal - protein
 
             val v = RemoteViews(ctx.packageName, R.layout.widget_progress)
@@ -37,7 +38,7 @@ class ProgressWidget : AppWidgetProvider() {
             v.setProgressBar(R.id.w_bar, goal, protein.coerceAtMost(goal), false)
             v.setTextViewText(
                 R.id.w_left,
-                if (left > 0) "$left g to go · water $water/$waterGoal" else "Goal reached · water $water/$waterGoal"
+                if (left > 0) "$left g to go · water $water/$waterGoal $unit" else "Goal reached · water $water/$waterGoal $unit"
             )
             val open = PendingIntent.getActivity(
                 ctx, 1,

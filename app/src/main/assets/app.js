@@ -23,7 +23,21 @@
     return "snack";
   }
 
-  const DEFAULT_SETTINGS = { proteinGoal: 130, kcalGoal: 2200, waterGoal: 8, glassMl: 250, unit: "kg" };
+  const OZ = 29.5735;
+  const DEFAULT_SETTINGS = { proteinGoal: 130, kcalGoal: 2200, waterGoalMl: 120 * OZ, bottleMl: 40 * OZ, units: "us", syncGoals: false };
+  const US = () => state.settings.units !== "metric";
+  // Weight
+  const kgToU = (kg) => (US() ? kg * LB : kg);
+  const uToKg = (v) => (US() ? v / LB : v);
+  const wUnit = () => (US() ? "lb" : "kg");
+  const fmtW = (kg) => `${r1(kgToU(kg))} ${wUnit()}`;
+  // Water
+  const mlToU = (ml) => (US() ? ml / OZ : ml);
+  const uToMl = (v) => (US() ? v * OZ : v);
+  const waterUnit = () => (US() ? "oz" : "ml");
+  const fmtWater = (ml) => `${r(mlToU(ml))} ${waterUnit()}`;
+  // Height
+  const fmtH = (cm) => { if (!US()) return `${r(cm)} cm`; const ti = cm / 2.54; let ft = Math.floor(ti / 12), inch = Math.round(ti - ft * 12); if (inch === 12) { ft++; inch = 0; } return `${ft}′${inch}″`; };
   const DEFAULT_REMINDERS = [
     { id: "r-breakfast", time: "08:30", label: "Protein with breakfast", kind: "protein", smart: true, on: false },
     { id: "r-lunch", time: "13:00", label: "Lunch protein check", kind: "protein", smart: true, on: false },
@@ -41,6 +55,8 @@
     favs: [],
     weights: [],
     reminders: [],
+    supps: [],
+    profile: {},
     aiStatus: "CHECKING",
     draft: null,
     range: 7,
@@ -63,11 +79,18 @@
   }
   function getDay(k) {
     const d = lsGet("ml.day." + k);
-    return { date: k, meals: d && Array.isArray(d.meals) ? d.meals : [], water: d ? n0(d.water) : 0, goal: d && d.goal ? n0(d.goal) : 0 };
+    // Older versions counted glasses of 250 ml in `water`.
+    const waterMl = d ? (d.waterMl != null ? n0(d.waterMl) : n0(d.water) * 250) : 0;
+    return {
+      date: k, meals: d && Array.isArray(d.meals) ? d.meals : [], waterMl,
+      waterAdds: d && Array.isArray(d.waterAdds) ? d.waterAdds : [],
+      supps: d && d.supps && typeof d.supps === "object" ? d.supps : {},
+      goal: d && d.goal ? n0(d.goal) : 0,
+    };
   }
   function saveDay() {
     const d = state.day;
-    lsSet("ml.day." + d.date, { date: d.date, meals: d.meals, water: d.water, goal: state.settings.proteinGoal });
+    lsSet("ml.day." + d.date, { date: d.date, meals: d.meals, waterMl: r(d.waterMl), waterAdds: d.waterAdds, supps: d.supps, goal: state.settings.proteinGoal });
     if (d.date === state.today) syncSummary();
   }
   function pruneThumbs(olderThanDays) {
@@ -83,10 +106,12 @@
     const s = lsGet("ml.settings") || {};
     const st = { ...DEFAULT_SETTINGS };
     if (n0(s.proteinGoal) >= 10 && n0(s.proteinGoal) <= 500) st.proteinGoal = r(n0(s.proteinGoal));
-    if (n0(s.kcalGoal) >= 500 && n0(s.kcalGoal) <= 8000) st.kcalGoal = r(n0(s.kcalGoal));
-    if (n0(s.waterGoal) >= 1 && n0(s.waterGoal) <= 30) st.waterGoal = r(n0(s.waterGoal));
-    if (n0(s.glassMl) >= 50 && n0(s.glassMl) <= 1000) st.glassMl = r(n0(s.glassMl));
-    if (s.unit === "lb" || s.unit === "kg") st.unit = s.unit;
+    if (n0(s.kcalGoal) >= 800 && n0(s.kcalGoal) <= 8000) st.kcalGoal = r(n0(s.kcalGoal));
+    if (n0(s.waterGoalMl) >= 200 && n0(s.waterGoalMl) <= 12000) st.waterGoalMl = n0(s.waterGoalMl);
+    else if (n0(s.waterGoal) >= 1 && n0(s.waterGoal) <= 30) st.waterGoalMl = n0(s.waterGoal) * (n0(s.glassMl) || 250);
+    if (n0(s.bottleMl) >= 100 && n0(s.bottleMl) <= 6000) st.bottleMl = n0(s.bottleMl);
+    if (s.units === "us" || s.units === "metric") st.units = s.units;
+    st.syncGoals = !!s.syncGoals;
     state.settings = st;
   }
   function loadAll() {
@@ -95,6 +120,8 @@
     state.weights = Array.isArray(lsGet("ml.weights")) ? lsGet("ml.weights") : [];
     const rem = lsGet("ml.reminders");
     state.reminders = Array.isArray(rem) ? rem : DEFAULT_REMINDERS.map((x) => ({ ...x }));
+    state.supps = Array.isArray(lsGet("ml.supps")) ? lsGet("ml.supps") : DEFAULT_SUPPS.map((x) => ({ ...x }));
+    state.profile = { ...DEFAULT_PROFILE, ...(lsGet("ml.profile") || {}) };
     state.day = getDay(state.view);
   }
 
@@ -161,7 +188,8 @@
     const t = sumMeals(d.meals);
     App.sync(JSON.stringify({
       date: state.today, protein: r1(t.protein), kcal: r(t.kcal), goal: state.settings.proteinGoal,
-      water: d.water, waterGoal: state.settings.waterGoal,
+      water: r(mlToU(d.waterMl)), waterGoal: r(mlToU(state.settings.waterGoalMl)), waterUnit: waterUnit(),
+      taken: Object.keys(d.supps || {}),
     }));
   }
 
@@ -223,16 +251,20 @@
     $("#tabToday").hidden = t !== "today";
     $("#tabTrends").hidden = t !== "trends";
     $("#tabSettings").hidden = t !== "settings";
+    $("#tabBody").hidden = t !== "body";
+    $("#navBody").setAttribute("aria-selected", String(t === "body"));
     $("#navToday").setAttribute("aria-selected", String(t === "today"));
     $("#navTrends").setAttribute("aria-selected", String(t === "trends"));
     $("#navSettings").setAttribute("aria-selected", String(t === "settings"));
     if (t === "trends") renderTrends();
     if (t === "settings") renderSettings();
+    if (t === "body") renderBody();
     window.scrollTo({ top: 0 });
   }
   $("#navToday").addEventListener("click", () => showTab("today"));
   $("#navTrends").addEventListener("click", () => showTab("trends"));
   $("#navSettings").addEventListener("click", () => showTab("settings"));
+  $("#navBody").addEventListener("click", () => showTab("body"));
 
   // ---------- sheets ----------
   let openSheet = null;
@@ -314,6 +346,7 @@
     $("#mCount").textContent = state.day.meals.length;
 
     renderWater();
+    renderSuppToday();
     renderMeals();
     renderQuick();
     const s = streaks();
@@ -321,16 +354,41 @@
   }
 
   function renderWater() {
-    const w = state.day.water, g = state.settings.waterGoal;
-    $("#wNow").textContent = w;
-    $("#wGoal").textContent = g;
-    $("#wMl").textContent = w * state.settings.glassMl;
-    const box = $("#glasses"); box.textContent = "";
-    for (let i = 0; i < Math.max(g, w); i++) { const el = document.createElement("i"); if (i < w) el.className = "full"; box.append(el); }
-    $("#wMinus").disabled = w <= 0;
+    const ml = state.day.waterMl, goal = state.settings.waterGoalMl, bottle = state.settings.bottleMl;
+    $("#wNow").textContent = r(mlToU(ml));
+    $("#wGoal").textContent = r(mlToU(goal));
+    $$(".wUnit").forEach((e) => { e.textContent = waterUnit(); });
+    const nB = ml / bottle, goalB = goal / bottle;
+    $("#wBottles").textContent = `${r1(nB)} of ${r1(goalB)} bottles`;
+    const box = $("#bottles"); box.textContent = "";
+    const count = Math.max(1, Math.ceil(Math.max(goalB, nB) - 1e-9));
+    for (let i = 0; i < count; i++) {
+      const b = document.createElement("div"); b.className = "bottle";
+      const fill = document.createElement("i"); fill.style.height = `${Math.max(0, Math.min(1, nB - i)) * 100}%`;
+      b.append(fill); box.append(b);
+    }
+    const sizeU = r(mlToU(bottle));
+    $$(".w-add button").forEach((btn) => {
+      const f = Number(btn.dataset.f);
+      btn.setAttribute("aria-label", `Add ${r(mlToU(bottle * f))} ${waterUnit()}`);
+      if (f === 1) btn.textContent = `+ Bottle (${sizeU} ${waterUnit()})`;
+    });
+    $("#wMinus").disabled = ml <= 0;
   }
-  $("#wPlus").addEventListener("click", () => { state.day.water = Math.min(40, state.day.water + 1); saveDay(); renderWater(); });
-  $("#wMinus").addEventListener("click", () => { state.day.water = Math.max(0, state.day.water - 1); saveDay(); renderWater(); });
+  $$(".w-add button").forEach((btn) => btn.addEventListener("click", () => {
+    const add = state.settings.bottleMl * Number(btn.dataset.f);
+    state.day.waterMl = Math.min(20000, state.day.waterMl + add);
+    state.day.waterAdds = [...state.day.waterAdds, r(add)].slice(-50);
+    saveDay(); renderWater();
+  }));
+  $("#wMinus").addEventListener("click", () => {
+    const adds = [...state.day.waterAdds];
+    const last = adds.length ? adds.pop() : state.settings.bottleMl / 4;
+    state.day.waterMl = Math.max(0, state.day.waterMl - last);
+    state.day.waterAdds = adds;
+    saveDay(); renderWater();
+    toast(`Removed ${fmtWater(last)}`);
+  });
 
   function renderMeals() {
     const box = $("#mealGroups");
@@ -512,22 +570,23 @@
   // ---------- goal button and calculator ----------
   $("#goalBtn").addEventListener("click", () => openCalc(true));
   $("#calcOpen").addEventListener("click", () => openCalc(false));
-  function latestWeightKg() { const w = [...state.weights].sort((a, b) => (a.date < b.date ? 1 : -1))[0]; return w ? w.kg : 0; }
   function openCalc(fromToday) {
-    $("#calcUnit").textContent = state.settings.unit;
-    const kg = latestWeightKg();
-    $("#calcW").value = kg ? r1(state.settings.unit === "lb" ? kg * LB : kg) : "";
+    $("#calcUnit").textContent = wUnit();
+    const kg = currentKg() || latestWeightKg();
+    $("#calcW").value = kg ? r1(kgToU(kg)) : "";
     $("#goalDirect").value = state.settings.proteinGoal;
     calcRender();
     sheetOpen("#calcSheet");
     if (fromToday) setTimeout(() => { $("#goalDirect").focus(); $("#goalDirect").select(); }, 250);
   }
   function setProteinGoal(v) {
+    const wasSynced = state.settings.syncGoals;
+    state.settings.syncGoals = false;
     state.settings.proteinGoal = Math.min(500, Math.max(10, r(v)));
     lsSet("ml.settings", state.settings);
     if (state.view === state.today) saveDay(); else syncSummary();
     renderToday(); renderSettings(); sheetClose();
-    toast(`Protein goal set to ${state.settings.proteinGoal} g`);
+    toast(`Protein goal set to ${state.settings.proteinGoal} g${wasSynced ? ". Automatic goals are now off." : ""}`);
   }
   $("#goalDirectSave").addEventListener("click", () => {
     const v = n0($("#goalDirect").value);
@@ -537,7 +596,7 @@
   $("#goalDirect").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#goalDirectSave").click(); });
   function calcValue() {
     const w = n0($("#calcW").value); if (!w) return 0;
-    const kg = state.settings.unit === "lb" ? w / LB : w;
+    const kg = uToKg(w);
     const per = Number((document.querySelector('input[name="calcGoal"]:checked') || {}).value || 1.6);
     return Math.round((kg * per) / 5) * 5;
   }
@@ -547,7 +606,7 @@
   $("#calcUse").addEventListener("click", () => {
     const v = calcValue(); if (!v) return;
     const w = n0($("#calcW").value);
-    if (w) logWeight(state.settings.unit === "lb" ? w / LB : w, true);
+    if (w && Math.abs(uToKg(w) - (currentKg() || 0)) > 0.2) logWeight(uToKg(w), true);
     setProteinGoal(v);
   });
 
@@ -573,7 +632,6 @@
     $("#tStreak").textContent = s.current;
     $("#tBest").textContent = s.best;
     renderTopFoods();
-    renderWeight();
   }
   function drawBars(el, days, goal) {
     const W = 340, H = 170, top = 22, bottom = 22, side = 4;
@@ -636,71 +694,435 @@
     });
   }
 
-  // ---------- weight ----------
-  function fmtW(kg) { return state.settings.unit === "lb" ? `${r1(kg * LB)} lb` : `${r1(kg)} kg`; }
+  // ---------- body: weight log, trend, profile, plan, synced targets ----------
+  const DEFAULT_PROFILE = { sex: "", birthYear: 0, heightCm: 0, activity: 1.55, targetKg: 0, paceKg: 0.5, useMeasured: false };
+  const KCAL_PER_KG = 7700;
+
+  function sortedWeights() { return [...state.weights].sort((a, b) => (a.date < b.date ? -1 : 1)); }
+  // Trend weight: an exponential moving average that discounts day-to-day water and food swings
+  // (10% weight per day, scaled for gaps between weigh-ins).
+  function trendSeries() {
+    const ws = sortedWeights();
+    let t = null, prev = null;
+    return ws.map((w) => {
+      if (t === null) t = w.kg;
+      else {
+        const gap = Math.max(1, Math.round((keyToDate(w.date) - keyToDate(prev)) / 864e5));
+        t += (1 - Math.pow(0.9, gap)) * (w.kg - t);
+      }
+      prev = w.date;
+      return { date: w.date, kg: w.kg, trend: t };
+    });
+  }
+  function currentKg() {
+    const tr = trendSeries();
+    if (!tr.length) return 0;
+    return tr.length >= 3 ? tr[tr.length - 1].trend : tr[tr.length - 1].kg;
+  }
+  function latestWeightKg() { const ws = sortedWeights(); return ws.length ? ws[ws.length - 1].kg : 0; }
+  function age() { const p = state.profile; return p.birthYear ? new Date().getFullYear() - p.birthYear : 0; }
+  function profileReady() { const p = state.profile; return !!(p.sex && p.birthYear && p.heightCm && currentKg()); }
+
+  // Mifflin–St Jeor resting energy, then an activity multiplier.
+  function bmr(kg) { const p = state.profile; return 10 * kg + 6.25 * p.heightCm - 5 * age() + (p.sex === "m" ? 5 : -161); }
+  function bmi(kg) { const h = state.profile.heightCm / 100; return h ? kg / (h * h) : 0; }
+
+  // Maintenance measured from the log: average intake minus the energy in the trend change.
+  function measuredMaintenance() {
+    const tr = trendSeries(); if (tr.length < 4) return null;
+    const end = state.today, start = addDays(end, -27);
+    const inWin = tr.filter((x) => x.date >= start);
+    if (inWin.length < 4) return null;
+    const first = inWin[0], last = inWin[inWin.length - 1];
+    const span = Math.round((keyToDate(last.date) - keyToDate(first.date)) / 864e5);
+    if (span < 14) return null;
+    let logged = 0, kcal = 0;
+    // Today is still in progress, so intake is counted only through yesterday.
+    for (let i = 0; i <= span; i++) {
+      const k = addDays(first.date, i);
+      if (k >= state.today) continue;
+      const d = k === state.view ? state.day : getDay(k);
+      if (d.meals.length) { logged++; kcal += sumMeals(d.meals).kcal; }
+    }
+    const days = Math.max(1, Math.min(span + 1, Math.round((keyToDate(state.today) - keyToDate(first.date)) / 864e5)));
+    if (logged < days * 0.8) return { tooFew: true, logged, span: days - 1 };
+    const avg = kcal / logged;
+    // Rate of change from a straight-line fit through the weigh-ins: steadier than two end points
+    // and without the lag of the smoothed trend.
+    const xs = inWin.map((w) => (keyToDate(w.date) - keyToDate(first.date)) / 864e5), ys = inWin.map((w) => w.kg);
+    const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+    const slope = xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / Math.max(1e-9, xs.reduce((a, x) => a + (x - mx) * (x - mx), 0));
+    const change = slope * span;
+    return { value: Math.round((avg - (change * KCAL_PER_KG) / span) / 10) * 10, avg: r(avg), change, span, logged };
+  }
+
+  function plan() {
+    if (!profileReady()) return null;
+    const p = state.profile, kg = currentKg();
+    const rest = bmr(kg);
+    const formula = rest * p.activity;
+    const meas = measuredMaintenance();
+    const maint = p.useMeasured && meas && meas.value ? meas.value : formula;
+    const target = p.targetKg || kg;
+    const diff = target - kg;
+    const mode = Math.abs(diff) < 0.5 ? "maintain" : diff < 0 ? "lose" : "gain";
+    const pace = mode === "maintain" ? 0 : Math.abs(p.paceKg) || (mode === "lose" ? 0.5 : 0.25);
+    let kcal = maint + (mode === "lose" ? -1 : mode === "gain" ? 1 : 0) * (pace * KCAL_PER_KG) / 7;
+    const floor = p.sex === "m" ? 1500 : 1200;
+    const warnings = [];
+    if (mode === "lose" && kcal < floor) { warnings.push(`At this pace your calories would drop below ${floor} kcal, which is hard to get enough nutrition from. The plan uses ${floor} kcal, so it will take longer.`); kcal = floor; }
+    const pctWeek = (pace / kg) * 100;
+    if (mode === "lose" && pctWeek > 1) warnings.push(`That's ${r1(pctWeek)}% of your body weight a week. Above about 1% a week you're more likely to lose muscle; a slower pace keeps more of it.`);
+    if (mode === "gain" && pctWeek > 0.5) warnings.push("Gaining faster than about 0.25–0.5% of body weight a week mostly adds fat, not muscle.");
+    const actualPace = mode === "maintain" ? 0 : Math.abs(maint - kcal) * 7 / KCAL_PER_KG;
+    const weeks = mode === "maintain" || !actualPace ? 0 : Math.abs(diff) / actualPace;
+    const eta = weeks ? addDays(state.today, Math.ceil(weeks * 7)) : "";
+    // Protein: g per kg by goal; with a BMI of 30+, base it on the weight at BMI 25 instead of total weight.
+    const perKg = mode === "lose" ? 2.0 : mode === "gain" ? 1.8 : 1.6;
+    const b = bmi(kg);
+    const refKg = b >= 30 ? 25 * Math.pow(p.heightCm / 100, 2) : kg;
+    const protein = Math.round((refKg * perKg) / 5) * 5;
+    // Fluids from drinks: National Academies total water (3.7 L men, 2.7 L women) less ~20% from food, plus activity.
+    const baseFluid = p.sex === "m" ? 3000 : 2200;
+    const extra = { 1.2: 0, 1.375: 250, 1.55: 500, 1.725: 750, 1.9: 1000 }[String(p.activity)] || 500;
+    const step = state.settings.bottleMl / 4;
+    const waterMl = Math.round((baseFluid + extra) / step) * step;
+    return { kg, rest, formula, maint, meas, mode, pace, target, kcal: Math.round(kcal / 10) * 10, warnings, weeks, eta, protein, perKg, refKg, b, waterMl, pctWeek };
+  }
+
+  function applyTargets(quiet) {
+    const pl = plan(); if (!pl) return false;
+    const s = state.settings;
+    const changes = [];
+    if (s.proteinGoal !== pl.protein) changes.push(`protein ${pl.protein} g`);
+    if (s.kcalGoal !== pl.kcal) changes.push(`calories ${pl.kcal}`);
+    if (Math.abs(s.waterGoalMl - pl.waterMl) > 1) changes.push(`water ${fmtWater(pl.waterMl)}`);
+    s.proteinGoal = pl.protein; s.kcalGoal = pl.kcal; s.waterGoalMl = pl.waterMl;
+    lsSet("ml.settings", s);
+    if (state.view === state.today) saveDay(); else syncSummary();
+    renderToday();
+    if (!quiet && changes.length) toast(`Goals updated: ${changes.join(", ")}`);
+    return true;
+  }
+  function maybeSync() { if (state.settings.syncGoals) applyTargets(false); }
+
   function logWeight(kg, quiet) {
-    if (!(kg >= 20 && kg <= 400)) { toast("Enter a weight between 20 and 400 kg (44–880 lb)."); return; }
+    if (!(kg >= 20 && kg <= 400)) { toast(US() ? "Enter a weight between 44 and 880 lb." : "Enter a weight between 20 and 400 kg."); return; }
     const date = state.today;
-    state.weights = [...state.weights.filter((w) => w.date !== date), { date, kg: r1(kg) }].sort((a, b) => (a.date < b.date ? -1 : 1));
+    state.weights = [...state.weights.filter((w) => w.date !== date), { date, kg: Math.round(kg * 100) / 100 }].sort((a, b) => (a.date < b.date ? -1 : 1));
     lsSet("ml.weights", state.weights);
     if (!quiet) toast(`Weight logged: ${fmtW(kg)}`);
+    maybeSync();
   }
   $("#weightForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const v = n0($("#wtIn").value);
-    logWeight(state.settings.unit === "lb" ? v / LB : v);
+    logWeight(uToKg(n0($("#wtIn").value)));
     $("#wtIn").value = "";
-    renderWeight();
+    renderBody();
   });
+
   function renderWeight() {
-    $("#wtUnit").textContent = state.settings.unit;
-    const ws = [...state.weights].sort((a, b) => (a.date < b.date ? -1 : 1));
+    $$(".uW").forEach((e) => { e.textContent = wUnit(); });
+    const tr = trendSeries();
     const el = $("#weightChart"), ul = $("#weightList");
     ul.textContent = "";
-    if (!ws.length) { el.innerHTML = ""; $("#wtSummary").textContent = "Log your weight now and then to see the trend and to calculate your protein goal."; return; }
-    const last = ws[ws.length - 1];
-    const cutoff = addDays(state.today, -30);
-    const base = ws.filter((w) => w.date <= cutoff).pop() || ws[0];
-    const diff = last.kg - base.kg;
-    const unitDiff = state.settings.unit === "lb" ? diff * LB : diff;
-    $("#wtSummary").textContent = ws.length > 1
-      ? `Latest ${fmtW(last.kg)}. ${unitDiff === 0 ? "No change" : (unitDiff > 0 ? "Up " : "Down ") + Math.abs(r1(unitDiff)) + " " + state.settings.unit} since ${keyToDate(base.date).toLocaleDateString([], { month: "short", day: "numeric" })}.`
-      : `Latest ${fmtW(last.kg)}. Log again on another day to see a trend.`;
-    const pts = ws.slice(-60);
+    $("#wtLegend").hidden = tr.length < 2;
+    if (!tr.length) { el.innerHTML = ""; $("#wtSummary").textContent = "Weigh yourself in the morning, after the bathroom and before eating, for the most consistent numbers."; return; }
+    const last = tr[tr.length - 1];
+    const back = tr.filter((x) => x.date <= addDays(state.today, -7)).pop();
+    let txt = `Latest ${fmtW(last.kg)}`;
+    if (tr.length >= 3) txt += ` · trend ${fmtW(last.trend)}`;
+    if (back) {
+      const d = kgToU(last.trend - back.trend);
+      txt += ` · ${Math.abs(d) < 0.05 ? "steady" : (d > 0 ? "up " : "down ") + Math.abs(r1(d)) + " " + wUnit()} over the last week`;
+    }
+    $("#wtSummary").textContent = txt + ".";
+    const pts = tr.slice(-60);
     if (pts.length > 1) {
-      const W = 340, H = 140, pad = 26;
-      const vals = pts.map((p) => (state.settings.unit === "lb" ? p.kg * LB : p.kg));
+      const W = 340, H = 150, padL = 34, padR = 8;
+      const vals = pts.flatMap((p) => [kgToU(p.kg), kgToU(p.trend)]);
+      const tgt = state.profile.targetKg ? kgToU(state.profile.targetKg) : null;
       let lo = Math.min(...vals), hi = Math.max(...vals);
+      if (tgt && tgt > lo - 15 && tgt < hi + 15) { lo = Math.min(lo, tgt); hi = Math.max(hi, tgt); }
       if (hi - lo < 2) { lo -= 1; hi += 1; }
-      const t0 = keyToDate(pts[0].date).getTime(), t1 = keyToDate(pts[pts.length - 1].date).getTime() || t0 + 1;
-      const x = (k) => pad + ((keyToDate(k).getTime() - t0) / Math.max(1, t1 - t0)) * (W - pad * 2);
-      const y = (v) => 14 + (1 - (v - lo) / (hi - lo)) * (H - 36);
-      const d = pts.map((p, i) => `${i ? "L" : "M"}${x(p.date).toFixed(1)},${y(vals[i]).toFixed(1)}`).join(" ");
+      const t0 = keyToDate(pts[0].date).getTime(), t1 = keyToDate(pts[pts.length - 1].date).getTime();
+      const x = (k) => padL + ((keyToDate(k).getTime() - t0) / Math.max(1, t1 - t0)) * (W - padL - padR);
+      const y = (v) => 12 + (1 - (v - lo) / (hi - lo)) * (H - 34);
       let s = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
       s += `<text class="w-lab" x="2" y="${y(hi) + 4}">${r1(hi)}</text><text class="w-lab" x="2" y="${y(lo) + 4}">${r1(lo)}</text>`;
-      s += `<path class="w-line" d="${d}"/>`;
-      pts.forEach((p, i) => { s += `<circle class="w-dot${i === pts.length - 1 ? " last" : ""}" cx="${x(p.date).toFixed(1)}" cy="${y(vals[i]).toFixed(1)}" r="${i === pts.length - 1 ? 4 : 2.5}"/>`; });
+      if (tgt && tgt >= lo && tgt <= hi) s += `<line class="w-target" x1="${padL}" x2="${W - padR}" y1="${y(tgt).toFixed(1)}" y2="${y(tgt).toFixed(1)}"/><text class="w-lab" x="${W - padR}" y="${(y(tgt) - 4).toFixed(1)}" text-anchor="end">goal</text>`;
+      pts.forEach((p) => { s += `<circle class="w-raw" cx="${x(p.date).toFixed(1)}" cy="${y(kgToU(p.kg)).toFixed(1)}" r="2.5"/>`; });
+      s += `<path class="w-trend" d="${pts.map((p, i) => `${i ? "L" : "M"}${x(p.date).toFixed(1)},${y(kgToU(p.trend)).toFixed(1)}`).join(" ")}"/>`;
       const f = (k) => { const dt = keyToDate(k); return `${dt.getMonth() + 1}/${dt.getDate()}`; };
-      s += `<text class="w-lab" x="${pad}" y="${H - 4}">${f(pts[0].date)}</text><text class="w-lab" x="${W - pad}" y="${H - 4}" text-anchor="end">${f(last.date)}</text>`;
-      s += `</svg>`;
-      el.innerHTML = s;
+      s += `<text class="w-lab" x="${padL}" y="${H - 4}">${f(pts[0].date)}</text><text class="w-lab" x="${W - padR}" y="${H - 4}" text-anchor="end">${f(last.date)}</text>`;
+      el.innerHTML = s + `</svg>`;
     } else el.innerHTML = "";
-    ws.slice(-5).reverse().forEach((w) => {
+    tr.slice(-5).reverse().forEach((w) => {
       const li = document.createElement("li");
       const nm = document.createElement("div"); nm.className = "nm"; nm.textContent = keyToDate(w.date).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
       const val = document.createElement("div"); val.className = "val"; val.textContent = fmtW(w.kg);
       const rm = document.createElement("button"); rm.type = "button"; rm.className = "rmx"; rm.textContent = "Remove";
-      rm.addEventListener("click", () => { state.weights = state.weights.filter((x) => x.date !== w.date); lsSet("ml.weights", state.weights); renderWeight(); });
+      rm.addEventListener("click", () => { state.weights = state.weights.filter((x) => x.date !== w.date); lsSet("ml.weights", state.weights); maybeSync(); renderBody(); });
       li.append(nm, val, rm);
       ul.append(li);
     });
   }
 
+  function fillPace() {
+    const sel = $("#plPace"); const cur = Math.abs(state.profile.paceKg) || 0.5;
+    const target = state.profile.targetKg, kg = currentKg();
+    const gaining = target && kg && target > kg + 0.5;
+    const opts = gaining
+      ? (US() ? [[0.5, "Slow: 0.5 lb a week"], [1, "Steady: 1 lb a week"]] : [[0.25, "Slow: 0.25 kg a week"], [0.5, "Steady: 0.5 kg a week"]])
+      : (US() ? [[0.5, "Gentle: 0.5 lb a week"], [1, "Steady: 1 lb a week"], [1.5, "Faster: 1.5 lb a week"], [2, "Aggressive: 2 lb a week"]]
+              : [[0.25, "Gentle: 0.25 kg a week"], [0.5, "Steady: 0.5 kg a week"], [0.75, "Faster: 0.75 kg a week"], [1, "Aggressive: 1 kg a week"]]);
+    sel.textContent = "";
+    let best = null;
+    opts.forEach(([v, l]) => {
+      const kgv = US() ? v / LB : v;
+      const o = document.createElement("option"); o.value = String(kgv); o.textContent = l; sel.append(o);
+      if (best === null || Math.abs(kgv - cur) < Math.abs(Number(best) - cur)) best = String(kgv);
+    });
+    sel.value = best;
+  }
+
+  function renderBody() {
+    const p = state.profile;
+    $$(".uW").forEach((e) => { e.textContent = wUnit(); });
+    renderWeight();
+    // Profile form
+    $("#pfSex").value = p.sex || "";
+    $("#pfAge").value = p.birthYear ? age() : "";
+    $("#hUS").hidden = !US(); $("#hMetric").hidden = US();
+    if (p.heightCm) {
+      const ti = p.heightCm / 2.54; let ft = Math.floor(ti / 12), inch = Math.round((ti - ft * 12) * 2) / 2; if (inch >= 12) { ft++; inch = 0; }
+      $("#pfFt").value = ft; $("#pfIn").value = inch; $("#pfCm").value = r1(p.heightCm);
+    }
+    $("#pfAct").value = String(p.activity);
+    $("#plTarget").value = p.targetKg ? r1(kgToU(p.targetKg)) : "";
+    fillPace();
+
+    const pl = plan();
+    $("#bodyMissing").hidden = !!pl;
+    $("#bodyTiles").hidden = !pl;
+    const out = $("#planOut"), warn = $("#planWarn");
+    const tl = $("#targetList"); tl.textContent = "";
+    $("#syncGoals").checked = !!state.settings.syncGoals;
+    $("#applyTargets").hidden = !pl || state.settings.syncGoals;
+    $("#maintCard").hidden = true;
+    if (!pl) { out.innerHTML = "<b>–</b>Fill in About you and log a weight first."; warn.hidden = true; return; }
+
+    const cat = pl.b < 18.5 ? "Underweight" : pl.b < 25 ? "Healthy range" : pl.b < 30 ? "Overweight" : "Obese range";
+    $("#bBmi").textContent = r1(pl.b);
+    $("#bBmiCat").textContent = `BMI · ${cat}. BMI doesn't tell muscle from fat, so muscular people often read high.`;
+    const h2 = Math.pow(p.heightCm / 100, 2);
+    $("#bHealthy").textContent = `${r(kgToU(18.5 * h2))}–${r(kgToU(24.9 * h2))} ${wUnit()}`;
+    $("#bBmr").textContent = `${Math.round(pl.rest / 10) * 10} kcal`;
+    $("#bTdee").textContent = `${Math.round(pl.maint / 10) * 10} kcal`;
+    $("#bTdeeLabel").textContent = p.useMeasured && pl.meas && pl.meas.value ? "Maintenance measured from your logs" : "Calories to maintain your weight (formula)";
+
+    // Plan result
+    const fmtPace = (kgw) => (US() ? `${r1(kgw * LB)} lb` : `${r1(kgw)} kg`);
+    let headline, detail;
+    if (pl.mode === "maintain") { headline = `${pl.kcal} kcal a day`; detail = "to hold your current weight."; }
+    else {
+      const dir = pl.mode === "lose" ? "lose" : "gain";
+      const togo = fmtW(Math.abs(pl.target - pl.kg));
+      const when = pl.eta ? keyToDate(pl.eta).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "";
+      headline = `${pl.kcal} kcal a day`;
+      detail = `to ${dir} ${togo} at about ${fmtPace(pl.pace)} a week (${r1(pl.pctWeek)}% of body weight). Expected around ${when}, about ${Math.ceil(pl.weeks)} weeks.`;
+    }
+    out.innerHTML = "";
+    const b = document.createElement("b"); b.textContent = headline;
+    out.append(b, document.createTextNode(detail));
+    warn.textContent = pl.warnings.join(" ");
+    warn.hidden = !pl.warnings.length;
+
+    // Measured maintenance
+    const m = pl.meas;
+    if (m) {
+      $("#maintCard").hidden = false;
+      if (m.tooFew) {
+        $("#maintText").textContent = `You've logged food on ${m.logged} of the last ${m.span + 1} days. Log meals on most days for two weeks and Meal Lens will measure your real maintenance calories from your intake and weight trend.`;
+        $("#useMeasured").parentElement.hidden = true;
+      } else {
+        const ch = kgToU(m.change);
+        $("#maintText").textContent = `Over ${m.span} days you averaged ${m.avg} kcal and your weight ${Math.abs(ch) < 0.05 ? "held steady" : (ch > 0 ? "rose " : "fell ") + Math.abs(r1(ch)) + " " + wUnit()}. That puts your real maintenance at about ${m.value} kcal, versus ${Math.round(pl.formula / 10) * 10} kcal from the formula. Measured is usually more accurate when you log everything you eat.`;
+        $("#useMeasured").parentElement.hidden = false;
+        $("#useMeasured").checked = !!p.useMeasured;
+      }
+    }
+
+    // Targets
+    const rows = [
+      ["Calories", `${pl.kcal} kcal`, pl.mode === "maintain" ? "Maintenance" : `${pl.mode === "lose" ? "Below" : "Above"} maintenance by ${Math.abs(r(pl.kcal - pl.maint))} kcal`],
+      ["Protein", `${pl.protein} g`, `${pl.perKg} g per kg of ${pl.b >= 30 ? "the weight at BMI 25 (" + fmtW(pl.refKg) + ")" : "body weight"}, for ${pl.mode === "lose" ? "keeping muscle while losing fat" : pl.mode === "gain" ? "building muscle" : "an active body"}`],
+      ["Water", fmtWater(pl.waterMl), `About ${r1(pl.waterMl / state.settings.bottleMl)} of your ${fmtWater(state.settings.bottleMl)} bottles, from National Academies fluid guidance plus your activity. Drink more on hot or sweaty days.`],
+    ];
+    rows.forEach(([a, v, why]) => {
+      const li = document.createElement("li");
+      const nm = document.createElement("div"); nm.className = "nm"; nm.textContent = a;
+      const val = document.createElement("div"); val.className = "val"; val.textContent = v;
+      const w = document.createElement("div"); w.className = "why"; w.textContent = why;
+      li.append(nm, val, w); tl.append(li);
+    });
+    const cur = state.settings;
+    $("#syncNote").textContent = state.settings.syncGoals
+      ? "Your daily goals follow this plan and update by themselves when you log your weight or change the plan."
+      : `Your current goals: protein ${cur.proteinGoal} g, calories ${cur.kcalGoal}, water ${fmtWater(cur.waterGoalMl)}.`;
+  }
+
+  $("#profileForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const p = state.profile;
+    const sex = $("#pfSex").value, a = n0($("#pfAge").value);
+    let cm = US() ? (n0($("#pfFt").value) * 12 + n0($("#pfIn").value)) * 2.54 : n0($("#pfCm").value);
+    if (!sex) { toast("Choose a sex for the formula."); return; }
+    if (a < 15 || a > 100) { toast("Enter an age between 15 and 100."); return; }
+    if (cm < 100 || cm > 250) { toast("Enter a height between 3′3″ and 8′2″ (100–250 cm)."); return; }
+    p.sex = sex; p.birthYear = new Date().getFullYear() - r(a); p.heightCm = r1(cm); p.activity = Number($("#pfAct").value) || 1.55;
+    lsSet("ml.profile", p);
+    toast("Saved");
+    maybeSync(); renderBody();
+  });
+  $("#planForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const t = n0($("#plTarget").value);
+    const p = state.profile;
+    if (t) {
+      const kg = uToKg(t);
+      if (kg < 30 || kg > 350) { toast("Enter a realistic goal weight."); return; }
+      p.targetKg = r1(kg);
+    } else p.targetKg = 0;
+    p.paceKg = Number($("#plPace").value) || 0.5;
+    lsSet("ml.profile", p);
+    toast("Plan saved");
+    maybeSync(); renderBody();
+  });
+  $("#plTarget").addEventListener("change", () => {
+    const t = n0($("#plTarget").value);
+    state.profile.targetKg = t ? r1(uToKg(t)) : 0;
+    fillPace();
+  });
+  $("#plPace").addEventListener("change", () => { state.profile.paceKg = Number($("#plPace").value); });
+  $("#useMeasured").addEventListener("change", () => {
+    state.profile.useMeasured = $("#useMeasured").checked;
+    lsSet("ml.profile", state.profile);
+    maybeSync(); renderBody();
+  });
+  $("#syncGoals").addEventListener("change", () => {
+    state.settings.syncGoals = $("#syncGoals").checked;
+    lsSet("ml.settings", state.settings);
+    if (state.settings.syncGoals) applyTargets(false);
+    renderBody();
+  });
+  $("#applyTargets").addEventListener("click", () => { if (applyTargets(false)) renderBody(); });
+
+  // ---------- supplements ----------
+  const DEFAULT_SUPPS = [
+    { id: "creatine", name: "Creatine monohydrate", dose: "1 scoop (5 g) in water", time: "09:00", remind: false,
+      note: "Every day, rest days too. Timing doesn't matter; daily consistency does. Expect 1–2 lb of extra water weight in the first weeks. No loading phase needed." },
+    { id: "fishoil", name: "Fish oil (Nature Made 1000 mg)", dose: "2 softgels with a meal", time: "13:00", remind: false,
+      note: "2 softgels give 500 mg EPA + DHA, the label's daily serving. Taking them with food helps absorption and avoids fishy burps." },
+    { id: "whey", name: "Whey protein (Gold Standard)", dose: "1 scoop (31 g)", time: "16:30", remind: false, food: { protein: 24, kcal: 120, carbs: 3, fat: 1.5 },
+      note: "1 scoop = 24 g protein, 120 kcal. Use it to close the gap your meals leave; tapping Add scoop logs it." },
+    { id: "magnesium", name: "Magnesium complex 500 mg", dose: "1 capsule with dinner", time: "20:00", remind: false, warn: true,
+      note: "1 capsule is 500 mg of magnesium, above the 350 mg/day upper limit for supplements. It's mostly oxide, which can loosen stools. Take it with food, stop if you get diarrhea, and ask your doctor before using it with kidney problems or daily long-term." },
+  ];
+  function saveSupps() { lsSet("ml.supps", state.supps); pushReminders(); }
+  function wheySuggestion(sp) {
+    const t = sumMeals(state.day.meals).protein, g = state.view === state.today ? state.settings.proteinGoal : (state.day.goal || state.settings.proteinGoal);
+    const gap = g - t, per = sp.food.protein;
+    const scoops = state.day.meals.filter((m) => m.suppId === sp.id).length;
+    let line = scoops ? `${scoops} scoop${scoops > 1 ? "s" : ""} today. ` : "";
+    if (gap <= 0) line += "Protein goal already reached; no scoop needed.";
+    else if (gap < per * 0.6) line += `${r(gap)} g to go; a meal or snack would cover it.`;
+    else { const n = Math.min(2, Math.max(1, Math.round(gap / per))); line += `${r(gap)} g to go; ${n} scoop${n > 1 ? "s" : ""} would cover ${n > 1 && gap > per * 2 ? "most of " : ""}it. Most people use 1–2 a day and get the rest from food.`; }
+    return line;
+  }
+  function renderSuppToday() {
+    const ul = $("#suppToday"); ul.textContent = "";
+    $("#suppCard").hidden = state.supps.length === 0;
+    let done = 0;
+    state.supps.forEach((sp) => {
+      const taken = state.day.supps[sp.id];
+      if (taken) done++;
+      const li = document.createElement("li"); li.className = "supp";
+      const info = document.createElement("div");
+      const nm = document.createElement("div"); nm.className = "nm"; nm.textContent = sp.name;
+      const dose = document.createElement("div"); dose.className = "dose"; dose.textContent = `${sp.dose} · ${fmtTime(sp.time)}`;
+      info.append(nm, dose);
+      const btn = document.createElement("button"); btn.type = "button";
+      if (sp.food) {
+        btn.className = "take"; btn.textContent = "Add scoop";
+        btn.setAttribute("aria-label", `Add a scoop of ${sp.name}`);
+        btn.addEventListener("click", () => {
+          state.day.supps = { ...state.day.supps, [sp.id]: Date.now() };
+          addMeal({ name: `${sp.name}, 1 scoop`, ...sp.food, type: defaultType(), source: "supplement", suppId: sp.id });
+        });
+      } else {
+        btn.className = "take" + (taken ? " done" : "");
+        btn.textContent = taken ? "Taken" : "Take";
+        btn.setAttribute("aria-pressed", String(!!taken));
+        btn.setAttribute("aria-label", `${taken ? "Undo " : "Mark "}${sp.name} ${taken ? "" : "as taken"}`);
+        btn.addEventListener("click", () => {
+          const s2 = { ...state.day.supps };
+          if (s2[sp.id]) delete s2[sp.id]; else s2[sp.id] = Date.now();
+          state.day.supps = s2; saveDay(); renderSuppToday();
+        });
+      }
+      const why = document.createElement("div"); why.className = "why" + (sp.warn ? " warn" : "");
+      why.textContent = sp.food ? wheySuggestion(sp) : (taken ? `Taken at ${new Date(taken).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. ` : "") + (sp.note || "");
+      li.append(info, btn, why);
+      ul.append(li);
+    });
+    const pills = state.supps.filter((x) => !x.food).length;
+    $("#suppCount").textContent = pills ? `${state.supps.filter((x) => !x.food && state.day.supps[x.id]).length} of ${pills} taken` : "";
+  }
+  function renderSuppSettings() {
+    const box = $("#suppSettings"); box.textContent = "";
+    state.supps.forEach((sp) => {
+      const row = document.createElement("div"); row.className = "suppset";
+      const nm = document.createElement("div"); nm.className = "nm"; nm.textContent = sp.name;
+      const time = document.createElement("input"); time.type = "time"; time.value = sp.time; time.id = "st-" + sp.id; time.setAttribute("aria-label", `${sp.name} time`);
+      const sw = document.createElement("label"); sw.className = "switch";
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!sp.remind; cb.id = "sr-" + sp.id; cb.setAttribute("aria-label", `Remind me to take ${sp.name}`);
+      sw.append(cb, document.createElement("span"));
+      const dose = document.createElement("input"); dose.type = "text"; dose.className = "dose-in"; dose.value = sp.dose; dose.maxLength = 80; dose.id = "sd-" + sp.id; dose.setAttribute("aria-label", `${sp.name} dose`);
+      const del = document.createElement("button"); del.type = "button"; del.className = "rmx"; del.textContent = "Remove supplement";
+      row.append(nm, time, sw, dose, del);
+      box.append(row);
+      time.addEventListener("change", () => { if (time.value) { sp.time = time.value; saveSupps(); } });
+      dose.addEventListener("change", () => { sp.dose = dose.value.trim() || sp.dose; saveSupps(); });
+      cb.addEventListener("change", () => {
+        sp.remind = cb.checked; saveSupps();
+        const st = App.status();
+        if (sp.remind && st && !st.notifications && !askedNotif) { App.requestNotifications(); askedNotif = true; }
+        if (sp.remind) toast(`Reminder on at ${fmtTime(sp.time)}`);
+      });
+      del.addEventListener("click", () => {
+        const copy = { ...sp }, idx = state.supps.indexOf(sp);
+        state.supps = state.supps.filter((x) => x !== sp); saveSupps(); renderSuppSettings(); renderSuppToday();
+        toast(`Removed ${sp.name}`, () => { state.supps.splice(idx, 0, copy); saveSupps(); renderSuppSettings(); renderSuppToday(); });
+      });
+    });
+  }
+  $("#suppForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    state.supps.push({ id: "s" + uid().slice(0, 8), name: $("#spName").value.trim(), dose: $("#spDose").value.trim(), time: $("#spTime").value || "09:00", remind: false, note: "" });
+    saveSupps(); renderSuppSettings(); renderSuppToday();
+    $("#suppForm").reset(); $("#suppAdd").open = false;
+    toast("Supplement added");
+  });
+
   // ---------- settings: goals ----------
   function renderSettings() {
     const s = state.settings;
     $("#goalP").value = s.proteinGoal; $("#goalK").value = s.kcalGoal;
-    $("#goalW").value = s.waterGoal; $("#glassMl").value = s.glassMl; $("#unitSel").value = s.unit;
+    $("#goalW").value = r(mlToU(s.waterGoalMl)); $("#bottleSz").value = r(mlToU(s.bottleMl)); $("#unitSel").value = s.units;
+    $$(".wUnit").forEach((e) => { e.textContent = waterUnit(); });
+    $("#goalsSyncNote").hidden = !s.syncGoals;
+    renderSuppSettings();
     renderNotifStatus();
     renderReminders();
     renderFavs();
@@ -708,16 +1130,23 @@
   }
   $("#goalsForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const p = n0($("#goalP").value), k = n0($("#goalK").value), w = n0($("#goalW").value), ml = n0($("#glassMl").value);
+    const units = $("#unitSel").value === "metric" ? "metric" : "us";
+    const unitsChanged = units !== state.settings.units;
+    // Read amounts in the units the form was showing.
+    const p = n0($("#goalP").value), k = n0($("#goalK").value);
+    const wMl = uToMl(n0($("#goalW").value)), bMl = uToMl(n0($("#bottleSz").value));
     if (p < 10 || p > 500) { toast("Protein goal must be between 10 and 500 g."); return; }
-    if (k < 500 || k > 8000) { toast("Calorie goal must be between 500 and 8000 kcal."); return; }
-    if (w < 1 || w > 30) { toast("Water goal must be between 1 and 30 glasses."); return; }
-    if (ml < 50 || ml > 1000) { toast("Glass size must be between 50 and 1000 ml."); return; }
-    state.settings = { proteinGoal: r(p), kcalGoal: r(k), waterGoal: r(w), glassMl: r(ml), unit: $("#unitSel").value === "lb" ? "lb" : "kg" };
+    if (k < 800 || k > 8000) { toast("Calorie goal must be between 800 and 8000 kcal."); return; }
+    if (wMl < 200 || wMl > 12000) { toast(US() ? "Water goal must be between 8 and 400 oz." : "Water goal must be between 200 and 12000 ml."); return; }
+    if (bMl < 100 || bMl > 6000) { toast(US() ? "Bottle size must be between 4 and 200 oz." : "Bottle size must be between 100 and 6000 ml."); return; }
+    const s0 = state.settings;
+    const goalsChanged = r(p) !== s0.proteinGoal || r(k) !== s0.kcalGoal || Math.abs(wMl - s0.waterGoalMl) > 15;
+    const wasSynced = s0.syncGoals;
+    state.settings = { ...s0, proteinGoal: r(p), kcalGoal: r(k), waterGoalMl: wMl, bottleMl: bMl, units, syncGoals: s0.syncGoals && !goalsChanged };
     lsSet("ml.settings", state.settings);
     if (state.view === state.today) saveDay(); else syncSummary();
-    renderToday();
-    toast("Goals saved");
+    renderToday(); renderSettings();
+    toast(wasSynced && goalsChanged ? "Goals saved. Automatic goals are now off." : unitsChanged ? "Saved. Units changed." : "Goals saved");
   });
 
   // ---------- settings: reminders ----------
@@ -752,7 +1181,11 @@
   });
   function saveReminders() {
     lsSet("ml.reminders", state.reminders);
-    App.setReminders(JSON.stringify(state.reminders));
+    pushReminders();
+  }
+  function pushReminders() {
+    const supp = state.supps.map((sp) => ({ id: "supp-" + sp.id, time: sp.time, label: `Take your ${sp.name.split(" (")[0].toLowerCase()}`, kind: "supplement", suppId: sp.id, dose: sp.dose, smart: true, on: !!sp.remind }));
+    App.setReminders(JSON.stringify([...state.reminders, ...supp]));
   }
   function renderReminders() {
     const box = $("#remList"); box.textContent = "";
@@ -821,18 +1254,18 @@
   // ---------- backup ----------
   function csvCell(v) { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
   $("#exportCsv").addEventListener("click", async () => {
-    const rows = [["date", "time", "meal", "name", "protein_g", "kcal", "carbs_g", "fat_g", "source", "water_glasses"]];
+    const rows = [["date", "time", "meal", "name", "protein_g", "kcal", "carbs_g", "fat_g", "source", "water_" + waterUnit(), "supplements_taken"]];
     dayKeys().forEach((k) => {
       const d = getDay(k);
-      d.meals.forEach((m, i) => rows.push([k, m.t ? new Date(m.t).toTimeString().slice(0, 5) : "", typeLabel(mealType(m)), m.name, r1(n0(m.protein)), r(n0(m.kcal)), r1(n0(m.carbs)), r1(n0(m.fat)), m.source || "", i === 0 ? d.water : ""]));
-      if (!d.meals.length && d.water) rows.push([k, "", "", "", "", "", "", "", "", d.water]);
+      d.meals.forEach((m, i) => rows.push([k, m.t ? new Date(m.t).toTimeString().slice(0, 5) : "", typeLabel(mealType(m)), m.name, r1(n0(m.protein)), r(n0(m.kcal)), r1(n0(m.carbs)), r1(n0(m.fat)), m.source || "", i === 0 ? r(mlToU(d.waterMl)) : "", i === 0 ? Object.keys(d.supps).join(" ") : ""]));
+      if (!d.meals.length && (d.waterMl || Object.keys(d.supps).length)) rows.push([k, "", "", "", "", "", "", "", "", r(mlToU(d.waterMl)), Object.keys(d.supps).join(" ")]);
     });
     await shareText(`meal-lens-${state.today}.csv`, "text/csv", rows.map((x) => x.map(csvCell).join(",")).join("\n"));
   });
   $("#backupBtn").addEventListener("click", async () => {
     const days = {};
     dayKeys().forEach((k) => { days[k] = lsGet("ml.day." + k); });
-    const data = { app: "meal-lens", version: 3, exported: new Date().toISOString(), settings: state.settings, favs: state.favs, weights: state.weights, reminders: state.reminders, days };
+    const data = { app: "meal-lens", version: 4, exported: new Date().toISOString(), settings: state.settings, favs: state.favs, weights: state.weights, reminders: state.reminders, supps: state.supps, profile: state.profile, days };
     await shareText(`meal-lens-backup-${state.today}.json`, "application/json", JSON.stringify(data));
   });
   async function shareText(name, mime, text) {
@@ -872,6 +1305,8 @@
       localStorage.setItem("ml.favs", JSON.stringify(Array.isArray(data.favs) ? data.favs : []));
       localStorage.setItem("ml.weights", JSON.stringify(Array.isArray(data.weights) ? data.weights : []));
       if (Array.isArray(data.reminders)) localStorage.setItem("ml.reminders", JSON.stringify(data.reminders));
+      if (Array.isArray(data.supps)) localStorage.setItem("ml.supps", JSON.stringify(data.supps));
+      if (data.profile && typeof data.profile === "object") localStorage.setItem("ml.profile", JSON.stringify(data.profile));
     } catch { toast("Restore failed: phone storage is full."); return; }
     pendingRestore = null;
     $("#restoreConfirm").hidden = true;
@@ -1283,7 +1718,9 @@
   loadAll();
   pruneThumbs(45);
   if (!lsGet("ml.reminders")) lsSet("ml.reminders", state.reminders);
-  App.setReminders(JSON.stringify(state.reminders));
+  if (!lsGet("ml.supps")) lsSet("ml.supps", state.supps);
+  if (state.settings.syncGoals && profileReady()) applyTargets(true);
+  pushReminders();
   renderAI();
   renderToday();
   syncSummary();

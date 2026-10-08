@@ -12,8 +12,8 @@ android {
         // ML Kit GenAI (Gemini Nano) needs API 26+; the model itself only runs on supported phones.
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "3.0"
+        versionCode = 4
+        versionName = "4.0"
     }
 
     // A fixed test key, so every new build installs over the previous one
